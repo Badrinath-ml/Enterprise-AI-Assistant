@@ -53,16 +53,27 @@ public class DocumentService {
         boolean admin = actor.getRole() == UserRole.ADMIN;
         UUID scopeDepartment = actor.getDepartment() == null ? null : actor.getDepartment().getId();
 
-        UUID filter = admin ? departmentFilter : null;
         if (!admin && departmentFilter != null && !departmentFilter.equals(scopeDepartment)) {
             throw new IllegalArgumentException("You can only browse documents in your department");
         }
 
         Pageable pageable = PageRequest.of(safePage, safeSize);
-        Page<Document> result = documentRepository.searchAccessible(
-                tenantId, scopeDepartment, admin, filter, status,
-                q == null || q.isBlank() ? null : q.trim(), pageable
-        );
+        String search = q == null || q.isBlank() ? null : q.trim();
+        Page<Document> result;
+
+        if (admin) {
+            result = departmentFilter == null
+                    ? documentRepository.searchAdmin(tenantId, status, search, pageable)
+                    : documentRepository.searchAdminByDepartment(
+                            tenantId, departmentFilter, status, search, pageable);
+        } else {
+            if (scopeDepartment == null) {
+                result = Page.empty(pageable);
+            } else {
+                result = documentRepository.searchDepartment(
+                        tenantId, scopeDepartment, status, search, pageable);
+            }
+        }
         return new DocumentPageResponse(
                 result.getContent().stream().map(DocumentResponse::from).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages()
