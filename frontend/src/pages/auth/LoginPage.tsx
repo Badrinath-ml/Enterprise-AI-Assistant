@@ -27,7 +27,7 @@ export const LoginPage: React.FC = () => {
     setFormError(null);
 
     if (!tenantSlug.trim()) {
-      setFormError('Tenant slug is required');
+      setFormError('Organization slug is required');
       return;
     }
     if (!email.trim()) {
@@ -66,7 +66,7 @@ export const LoginPage: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-slate-900">Sign in to your account</h3>
         <p className="text-xs text-slate-500 mt-1">
-          Enter your organization slug and credentials to access your tenant.
+          Enter your organization details and credentials to continue.
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-6 pt-5 border-t border-slate-100 text-center">
         <p className="text-xs text-slate-500">
-          Need to register a new tenant?{' '}
+          Need to create a new organization?{' '}
           <Link
             to="/register"
             className="font-semibold text-slate-900 hover:underline inline-flex items-center gap-1"
