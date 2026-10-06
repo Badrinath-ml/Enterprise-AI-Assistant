@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../common/Avatar';
 import { Dropdown } from '../common/Dropdown';
-import { Badge } from '../common/Badge';
 
 interface TopbarProps { onToggleMobileMenu: () => void; }
 
@@ -18,6 +17,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
     if (path.startsWith('/users')) return 'Users';
     if (path.startsWith('/team')) return 'My Team';
     if (path.startsWith('/departments')) return 'Departments';
+    if (path.startsWith('/documents')) return 'Documents';
     if (path.startsWith('/profile')) return 'Profile';
     return 'Enterprise Assistant';
   };
@@ -40,7 +40,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
       </div>
       <div className="flex items-center gap-3">
         {tenant && <div className="hidden sm:block text-[11px] text-slate-600"><span className="text-slate-400">Organization:</span> <span className="font-semibold text-slate-900">{tenant.name}</span></div>}
-        <Badge role={user?.role} size="sm">{user?.role}</Badge>
         <Dropdown align="right" trigger={<Avatar name={user?.name} size="sm" />} items={userMenuItems} />
       </div>
     </header>

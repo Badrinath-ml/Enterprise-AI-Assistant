@@ -1,31 +1,19 @@
 # Enterprise Knowledge Assistant — Backend
 
-Level 1 implementation of the **Enterprise Knowledge Assistant Platform**:
-
-- Authentication
-- Multi-tenancy
-- RBAC
-- Departments
-- Tenant-scoped users
-- PostgreSQL
-- Flyway migrations
-- JWT access tokens
-- Docker-based local database
-- Spring Boot Actuator
-- Spring AI baseline for later RAG integration
+The backend currently covers **Level 1 identity/RBAC/organization management** and **Level 2 document management**.
 
 ## Stack
 
 - Java 21
 - Spring Boot 4.1.1
-- Spring AI 2.0.1
+- Spring AI 2.0.1 baseline
 - Maven
 - PostgreSQL 17 + pgvector image
-- Spring Security
-- JWT
+- Spring Security + JWT
 - Spring Data JPA
 - Flyway
-- React frontend is intentionally not included in this backend-first phase
+- Docker Compose
+- Local filesystem document storage in development
 
 ## Architecture
 
@@ -36,16 +24,19 @@ React
 Spring Boot
   |
   +-- Auth / JWT
-  +-- Tenant
+  +-- Tenant isolation
   +-- RBAC
-  +-- Departments
   +-- Users
+  +-- Departments
+  +-- Documents
+  |     +-- Metadata -> PostgreSQL
+  |     +-- Binary   -> FileStorageService -> local filesystem
   |
   v
 PostgreSQL
 ```
 
-RAG, RabbitMQ, Redis and document ingestion are deliberately deferred to later levels.
+Document ingestion, chunking, embeddings, pgvector retrieval, RAG, and agent workflows are intentionally deferred to later phases.
 
 ## Prerequisites
 
@@ -53,49 +44,20 @@ RAG, RabbitMQ, Redis and document ingestion are deliberately deferred to later l
 - Maven 3.9+
 - Docker Desktop
 
-Verify:
-
-```bash
-java -version
-mvn -version
-docker --version
-```
-
-## 1. Start PostgreSQL
+## Run
 
 ```bash
 docker compose up -d postgres
-```
-
-Check:
-
-```bash
-docker compose ps
-```
-
-To use the Aiven PostgreSQL database instead, set `DB_URL`, `DB_USERNAME`, and
-`DB_PASSWORD` in the ignored `.env` file. The JDBC URL must include
-`sslmode=require`; do not commit the password.
-
-## 2. Run backend
-
-```bash
 mvn spring-boot:run
 ```
 
-Backend:
+Backend: `http://localhost:8080`
 
-```text
-http://localhost:8080
-```
+Health: `GET /actuator/health`
 
-Health:
+## Authentication
 
-```text
-GET /actuator/health
-```
-
-## 3. Register a tenant + first admin
+Register the first organization/admin:
 
 ```http
 POST /api/v1/auth/register
@@ -110,9 +72,7 @@ Content-Type: application/json
 }
 ```
 
-The first registration for a tenant becomes an `ADMIN`.
-
-## 4. Login
+Then log in with:
 
 ```http
 POST /api/v1/auth/login
@@ -125,74 +85,9 @@ Content-Type: application/json
 }
 ```
 
-Copy the returned `accessToken`.
+Use the returned access token as:
 
-Use:
-
-```text
-Authorization: Bearer <accessToken>
-```
-
-## 5. Create departments
-
-```http
-POST /api/v1/departments
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Human Resources"
-}
-```
-
-Then:
-
-```http
-POST /api/v1/departments
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Engineering"
-}
-```
-
-## 6. Create users
-
-Only an `ADMIN` can create users.
-
-```http
-POST /api/v1/users
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Engineering User",
-  "email": "engineer@acme.com",
-  "password": "Engineer@12345",
-  "departmentId": "<ENGINEERING_DEPARTMENT_UUID>",
-  "role": "EMPLOYEE"
-}
-```
-
-## 7. Tenant isolation
-
-The JWT contains:
-
-```json
-{
-  "sub": "<user-id>",
-  "tenant_id": "<tenant-id>",
-  "role": "ADMIN",
-  "department_id": "<department-id>"
-}
-```
-
-The backend establishes a request-scoped `TenantContext` from the JWT.
-
-Every tenant-owned repository query must explicitly scope by `tenant_id`.
-
-This is intentional: **do not rely on the frontend to enforce tenant isolation.**
+`Authorization: Bearer <token>`
 
 ## Current API
 
@@ -205,59 +100,77 @@ GET  /actuator/health
 GET  /actuator/info
 ```
 
-### Authenticated
+### Organization
 
 ```text
 GET  /api/v1/tenant/me
 GET  /api/v1/departments
 POST /api/v1/departments
+PUT  /api/v1/departments/{id}
+DELETE /api/v1/departments/{id}
 ```
 
-### Admin
+### Users
 
 ```text
-POST /api/v1/users
+GET    /api/v1/users
+POST   /api/v1/users
+PUT    /api/v1/users/{id}
+DELETE /api/v1/users/{id}   # soft-deactivation
 ```
 
-## Next implementation
+### Documents
 
-Level 1 is not finished until these are added:
-
-1. Refresh-token rotation
-2. Admin-only department management
-3. User listing/update/deactivation
-4. Explicit tenant authorization tests
-5. Document entity + versioning
-6. Document lifecycle
-7. File storage abstraction
-8. Integration tests with Testcontainers
-9. OpenAPI
-10. Audit logging
-
-Then Level 2 can add:
+See [docs/LEVEL-2.md](docs/LEVEL-2.md) for roles, storage, lifecycle, and validation details.
 
 ```text
-Document
-  ↓
-Async ingestion
-  ↓
-Chunking
-  ↓
-Embeddings
-  ↓
-pgvector
-  ↓
-Spring AI
-  ↓
-RAG
+GET    /api/v1/documents
+GET    /api/v1/documents/{id}
+POST   /api/v1/documents
+PUT    /api/v1/documents/{id}
+PUT    /api/v1/documents/{id}/content
+GET    /api/v1/documents/{id}/content
+GET    /api/v1/documents/{id}/download
+DELETE /api/v1/documents/{id}
 ```
 
-## Dependency rule
+## Database
 
-Do **not** manually add versions for Spring Framework, Spring Security, Hibernate, Jackson, Tomcat, etc.
+Flyway migrations are the source of truth.
 
-Spring Boot manages those versions.
+- `V1__initial_schema.sql` — tenants, departments, users
+- `V2__documents.sql` — document metadata and indexes
 
-Spring AI is managed through its BOM.
+JPA runs with `ddl-auto: validate`.
 
-Only pin a third-party dependency when there is a deliberate compatibility/security reason.
+## Security model
+
+- Tenant ID is taken from the authenticated JWT and request-scoped TenantContext.
+- Every document lookup includes tenant scope.
+- Role/department checks are enforced in backend services, not only in the frontend.
+- Employees are read-only for documents.
+- Managers are restricted to their own department for document mutations.
+- Stored files are resolved beneath the configured storage root.
+
+## Development notes
+
+Set a strong `JWT_SECRET` in any real deployment. The fallback secret in `application.yml` is development-only.
+
+Set `DOCUMENT_STORAGE_PATH` to move local storage elsewhere.
+
+Do not commit `storage/documents` or production secrets.
+
+## Verification
+
+Backend:
+
+```bash
+mvn test
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+```

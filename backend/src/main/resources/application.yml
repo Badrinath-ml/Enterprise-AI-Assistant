@@ -24,6 +24,11 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -38,6 +43,8 @@ management:
         enabled: true
 
 app:
+  storage:
+    documents-path: ${DOCUMENT_STORAGE_PATH:storage/documents}
   security:
     jwt:
       # Replace this in any real deployment with a strong secret of >= 32 bytes.
