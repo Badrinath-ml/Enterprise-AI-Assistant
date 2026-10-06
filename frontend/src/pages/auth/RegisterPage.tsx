@@ -13,8 +13,8 @@ export const RegisterPage: React.FC = () => {
   const { success, error: toastError } = useToast();
   const navigate = useNavigate();
 
-  const [tenantName, setTenantName] = useState('');
-  const [tenantSlug, setTenantSlug] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [organizationSlug, setOrganizationSlug] = useState('');
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   const [name, setName] = useState('');
@@ -25,16 +25,16 @@ export const RegisterPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  const handleTenantNameChange = (val: string) => {
-    setTenantName(val);
+  const handleOrganizationNameChange = (val: string) => {
+    setOrganizationName(val);
     if (!isSlugManuallyEdited) {
-      setTenantSlug(slugify(val));
+      setOrganizationSlug(slugify(val));
     }
   };
 
-  const handleTenantSlugChange = (val: string) => {
+  const handleOrganizationSlugChange = (val: string) => {
     setIsSlugManuallyEdited(true);
-    setTenantSlug(slugify(val));
+    setOrganizationSlug(slugify(val));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,12 +43,12 @@ export const RegisterPage: React.FC = () => {
     setValidationErrors({});
 
     // Client-side validations
-    if (!tenantName.trim()) {
-      setFormError('Tenant name is required');
+    if (!organizationName.trim()) {
+      setFormError('Organization name is required');
       return;
     }
-    if (!tenantSlug.trim()) {
-      setFormError('Tenant slug is required');
+    if (!organizationSlug.trim()) {
+      setFormError('Organization slug is required');
       return;
     }
     if (!name.trim()) {
@@ -67,14 +67,14 @@ export const RegisterPage: React.FC = () => {
     setIsLoading(true);
     try {
       await register({
-        tenantName: tenantName.trim(),
-        tenantSlug: tenantSlug.trim().toLowerCase(),
+        organizationName: organizationName.trim(),
+        organizationSlug: organizationSlug.trim().toLowerCase(),
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
       });
 
-      success('Tenant and administrator account registered!', 'Registration Complete');
+      success('Organization and administrator account registered!', 'Registration Complete');
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const apiErr = err as ApiError;
@@ -94,7 +94,7 @@ export const RegisterPage: React.FC = () => {
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-slate-900">Create new organization</h3>
         <p className="text-xs text-slate-500 mt-1">
-          Set up a new isolated tenant. The initial account will be granted <span className="font-semibold text-slate-700">ADMIN</span> permissions.
+          Create your organization and the first administrator account.
         </p>
       </div>
 
@@ -109,21 +109,21 @@ export const RegisterPage: React.FC = () => {
           <Input
             label="Organization Name"
             placeholder="Acme Corp"
-            value={tenantName}
-            onChange={(e) => handleTenantNameChange(e.target.value)}
+            value={organizationName}
+            onChange={(e) => handleOrganizationNameChange(e.target.value)}
             leftIcon={<Building className="w-4 h-4" />}
-            error={validationErrors['tenantName']}
+            error={validationErrors['organizationName']}
             required
           />
 
           <Input
-            label="Tenant Slug"
+            label="Organization Slug"
             placeholder="acme"
-            value={tenantSlug}
-            onChange={(e) => handleTenantSlugChange(e.target.value)}
+            value={organizationSlug}
+            onChange={(e) => handleOrganizationSlugChange(e.target.value)}
             leftIcon={<Hash className="w-4 h-4" />}
             helperText="Used in login identifier"
-            error={validationErrors['tenantSlug']}
+            error={validationErrors['organizationSlug']}
             required
           />
         </div>
@@ -168,7 +168,7 @@ export const RegisterPage: React.FC = () => {
           isLoading={isLoading}
           rightIcon={<ArrowRight className="w-4 h-4" />}
         >
-          Create Organization & Admin
+          Create Organization
         </Button>
       </form>
 
