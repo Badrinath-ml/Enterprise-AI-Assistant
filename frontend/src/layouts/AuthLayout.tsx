@@ -13,7 +13,7 @@ export const AuthLayout: React.FC = () => {
           Enterprise Knowledge Assistant
         </h2>
         <p className="mt-1 text-xs text-slate-500">
-          Multi-tenant secure knowledge & identity platform
+          Private organization knowledge workspace
         </p>
       </div>
 
@@ -23,7 +23,7 @@ export const AuthLayout: React.FC = () => {
         </div>
 
         <div className="mt-6 text-center text-[11px] text-slate-400">
-          Protected by tenant-isolated Spring Security & JWT Bearer authentication.
+          Your organization's workspace is protected and access is managed securely.
         </div>
       </div>
     </div>
