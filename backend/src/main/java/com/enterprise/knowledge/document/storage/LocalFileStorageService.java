@@ -42,7 +42,7 @@ public class LocalFileStorageService implements FileStorageService {
         try (InputStream input = file.getInputStream()) {
             Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        String storageKey = root.relativize(target).toString().replace('\', '/');
+        String storageKey = root.relativize(target).toString().replace('\'', '/');
         return new StoredFile(storageKey, original, file.getContentType(), file.getSize());
     }
 
@@ -93,7 +93,8 @@ public class LocalFileStorageService implements FileStorageService {
         if (name == null || name.isBlank()) {
             return "document";
         }
-        return Paths.get(name).getFileName().toString().replaceAll("[\\/:*?"<>|\p{Cntrl}]", "_");
+        return java.nio.file.Paths.get(name).getFileName().toString().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+
     }
 
     private static String extensionOf(String name) {
