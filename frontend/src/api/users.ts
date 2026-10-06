@@ -7,10 +7,10 @@ export const userApi = {
     return response.data;
   },
 
-  async getUsers(): Promise<UserResponse[]> {
-    // Backend Level 1 does not yet expose GET /api/v1/users;
-    // Calling this will return 404/405 until backend implements it.
-    const response = await apiClient.get<UserResponse[]>('/api/v1/users');
+  async getUsers(departmentId?: string): Promise<UserResponse[]> {
+    const response = await apiClient.get<UserResponse[]>('/api/v1/users', {
+      params: departmentId ? { departmentId } : undefined,
+    });
     return response.data;
   },
 };
