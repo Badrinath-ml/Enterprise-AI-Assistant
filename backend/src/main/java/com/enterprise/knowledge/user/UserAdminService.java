@@ -39,6 +39,10 @@ public class UserAdminService {
             throw new IllegalArgumentException("You do not have permission to create users");
         }
 
+        if (request.role() == UserRole.MANAGER && request.departmentId() == null) {
+            throw new IllegalArgumentException("Managers must be assigned to a department");
+        }
+
         return userService.createUser(
                 tenantId, request.name(), request.email(), request.password(),
                 request.departmentId(), request.role()
