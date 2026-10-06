@@ -1,14 +1,1 @@
-import { apiClient } from './client';
-import { CreateDepartmentRequest, DepartmentResponse } from '../types/department';
-
-export const departmentApi = {
-  async getDepartments(): Promise<DepartmentResponse[]> {
-    const response = await apiClient.get<DepartmentResponse[]>('/api/v1/departments');
-    return response.data;
-  },
-
-  async createDepartment(payload: CreateDepartmentRequest): Promise<DepartmentResponse> {
-    const response = await apiClient.post<DepartmentResponse>('/api/v1/departments', payload);
-    return response.data;
-  },
-};
+import {apiClient}from'./client';import{CreateDepartmentRequest,DepartmentResponse,UpdateDepartmentRequest}from'../types/department';export const departmentApi={async getDepartments(){const r=await apiClient.get<DepartmentResponse[]>('/api/v1/departments');return r.data;},async createDepartment(p:CreateDepartmentRequest){const r=await apiClient.post<DepartmentResponse>('/api/v1/departments',p);return r.data;},async updateDepartment(id:string,p:UpdateDepartmentRequest){const r=await apiClient.put<DepartmentResponse>(`/api/v1/departments/${id}`,p);return r.data;},async deleteDepartment(id:string){await apiClient.delete(`/api/v1/departments/${id}`);}};

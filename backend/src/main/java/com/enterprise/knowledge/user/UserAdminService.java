@@ -1,51 +1,8 @@
 package com.enterprise.knowledge.user;
-
-import com.enterprise.knowledge.user.dto.CreateUserRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.UUID;
-
-@Service
-public class UserAdminService {
-    private final UserService userService;
-
-    public UserAdminService(UserService userService) {
-        this.userService = userService;
-    }
-
-    @Transactional
-    public AppUser create(UUID tenantId, UUID actorId, CreateUserRequest request) {
-        AppUser actor = userService.findByIdAndTenant(actorId, tenantId);
-
-        if (actor.getRole() == UserRole.MANAGER) {
-            if (request.role() != UserRole.EMPLOYEE) {
-                throw new IllegalArgumentException("Managers can create employees only");
-            }
-            if (actor.getDepartment() == null) {
-                throw new IllegalArgumentException("Manager is not assigned to a department");
-            }
-            if (request.departmentId() != null
-                    && !actor.getDepartment().getId().equals(request.departmentId())) {
-                throw new IllegalArgumentException("Managers can only add employees to their own department");
-            }
-
-            return userService.createUser(
-                    tenantId, request.name(), request.email(), request.password(),
-                    actor.getDepartment().getId(), UserRole.EMPLOYEE
-            );
-        }
-
-        if (actor.getRole() != UserRole.ADMIN) {
-            throw new IllegalArgumentException("You do not have permission to create users");
-        }
-
-        if (request.role() == UserRole.MANAGER && request.departmentId() == null) {
-            throw new IllegalArgumentException("Managers must be assigned to a department");
-        }
-
-        return userService.createUser(
-                tenantId, request.name(), request.email(), request.password(),
-                request.departmentId(), request.role()
-        );
-    }
+import com.enterprise.knowledge.user.dto.CreateUserRequest;import com.enterprise.knowledge.user.dto.UpdateUserRequest;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import java.util.UUID;
+@Service public class UserAdminService{
+private final UserService userService;private final UserRepository userRepository;public UserAdminService(UserService userService,UserRepository userRepository){this.userService=userService;this.userRepository=userRepository;}
+@Transactional public AppUser create(UUID tenantId,UUID actorId,CreateUserRequest request){AppUser actor=userService.findByIdAndTenant(actorId,tenantId);if(actor.getRole()==UserRole.MANAGER){if(request.role()!=UserRole.EMPLOYEE)throw new IllegalArgumentException("Managers can create employees only");if(actor.getDepartment()==null)throw new IllegalArgumentException("Manager is not assigned to a department");if(request.departmentId()!=null&&!actor.getDepartment().getId().equals(request.departmentId()))throw new IllegalArgumentException("Managers can only add employees to their own department");return userService.createUser(tenantId,request.name(),request.email(),request.password(),actor.getDepartment().getId(),UserRole.EMPLOYEE);}if(actor.getRole()!=UserRole.ADMIN)throw new IllegalArgumentException("You do not have permission to create users");if(request.role()==UserRole.MANAGER&&request.departmentId()==null)throw new IllegalArgumentException("Managers must be assigned to a department");return userService.createUser(tenantId,request.name(),request.email(),request.password(),request.departmentId(),request.role());}
+@Transactional public AppUser update(UUID tenantId,UUID actorId,UUID targetId,UpdateUserRequest request){AppUser actor=userService.findByIdAndTenant(actorId,tenantId);AppUser target=userService.findByIdAndTenant(targetId,tenantId);if(actor.getId().equals(target.getId()))throw new IllegalArgumentException("Manage your own account from Profile");if(actor.getRole()==UserRole.MANAGER){if(target.getRole()!=UserRole.EMPLOYEE)throw new IllegalArgumentException("Managers can manage employees only");if(actor.getDepartment()==null||target.getDepartment()==null||!actor.getDepartment().getId().equals(target.getDepartment().getId()))throw new IllegalArgumentException("Managers can only manage employees in their own department");if(request.role()!=UserRole.EMPLOYEE||!actor.getDepartment().getId().equals(request.departmentId()))throw new IllegalArgumentException("Managers cannot change an employee's role or department");}else if(actor.getRole()!=UserRole.ADMIN)throw new IllegalArgumentException("You do not have permission to manage users");if(request.role()==UserRole.MANAGER&&request.departmentId()==null)throw new IllegalArgumentException("Managers must be assigned to a department");if(target.getRole()==UserRole.ADMIN&&request.role()!=UserRole.ADMIN&&userRepository.countByTenantIdAndRoleAndActiveTrue(tenantId,UserRole.ADMIN)<=1)throw new IllegalArgumentException("The organization must have at least one active admin");if(target.getRole()==UserRole.ADMIN&&target.isActive()&&!request.active()&&userRepository.countByTenantIdAndRoleAndActiveTrue(tenantId,UserRole.ADMIN)<=1)throw new IllegalArgumentException("The organization must have at least one active admin");return userService.updateUser(tenantId,target,request.name(),request.email(),request.departmentId(),request.role(),request.active());}
+@Transactional public void deactivate(UUID tenantId,UUID actorId,UUID targetId){AppUser actor=userService.findByIdAndTenant(actorId,tenantId);AppUser target=userService.findByIdAndTenant(targetId,tenantId);if(actor.getId().equals(target.getId()))throw new IllegalArgumentException("You cannot remove your own account");if(actor.getRole()==UserRole.MANAGER){if(target.getRole()!=UserRole.EMPLOYEE||actor.getDepartment()==null||target.getDepartment()==null||!actor.getDepartment().getId().equals(target.getDepartment().getId()))throw new IllegalArgumentException("Managers can only remove employees in their own department");}else if(actor.getRole()!=UserRole.ADMIN)throw new IllegalArgumentException("You do not have permission to remove users");if(target.getRole()==UserRole.ADMIN&&target.isActive()&&userRepository.countByTenantIdAndRoleAndActiveTrue(tenantId,UserRole.ADMIN)<=1)throw new IllegalArgumentException("The organization must have at least one active admin");target.setActive(false);}
 }

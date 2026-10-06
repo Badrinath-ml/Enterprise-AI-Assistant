@@ -1,36 +1,8 @@
 package com.enterprise.knowledge.department;
-
-import com.enterprise.knowledge.tenant.Tenant;
-import com.enterprise.knowledge.tenant.TenantRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.UUID;
-
-@Service
-public class DepartmentService {
-
-    private final DepartmentRepository departmentRepository;
-    private final TenantRepository tenantRepository;
-
-    public DepartmentService(
-            DepartmentRepository departmentRepository,
-            TenantRepository tenantRepository) {
-        this.departmentRepository = departmentRepository;
-        this.tenantRepository = tenantRepository;
-    }
-
-    @Transactional(readOnly = true)
-    public List<Department> findAll(UUID tenantId) {
-        return departmentRepository.findAllByTenantId(tenantId);
-    }
-
-    @Transactional
-    public Department create(UUID tenantId, String name) {
-        Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
-
-        return departmentRepository.save(new Department(tenant, name.trim()));
-    }
+import com.enterprise.knowledge.tenant.Tenant;import com.enterprise.knowledge.tenant.TenantRepository;import com.enterprise.knowledge.user.UserRepository;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import java.util.List;import java.util.UUID;
+@Service public class DepartmentService{private final DepartmentRepository departmentRepository;private final TenantRepository tenantRepository;private final UserRepository userRepository;public DepartmentService(DepartmentRepository departmentRepository,TenantRepository tenantRepository,UserRepository userRepository){this.departmentRepository=departmentRepository;this.tenantRepository=tenantRepository;this.userRepository=userRepository;}
+@Transactional(readOnly=true)public List<Department> findAll(UUID tenantId){return departmentRepository.findAllByTenantId(tenantId);}
+@Transactional public Department create(UUID tenantId,String name){String n=name.trim();if(departmentRepository.existsByTenantIdAndNameIgnoreCase(tenantId,n))throw new IllegalArgumentException("A department with this name already exists");Tenant tenant=tenantRepository.findById(tenantId).orElseThrow(()->new IllegalArgumentException("Organization not found"));return departmentRepository.save(new Department(tenant,n));}
+@Transactional public Department update(UUID tenantId,UUID id,String name){String n=name.trim();Department d=departmentRepository.findByIdAndTenantId(id,tenantId).orElseThrow(()->new IllegalArgumentException("Department not found"));if(departmentRepository.existsByTenantIdAndNameIgnoreCaseAndIdNot(tenantId,n,id))throw new IllegalArgumentException("A department with this name already exists");d.setName(n);return departmentRepository.save(d);}
+@Transactional public void delete(UUID tenantId,UUID id){Department d=departmentRepository.findByIdAndTenantId(id,tenantId).orElseThrow(()->new IllegalArgumentException("Department not found"));long count=userRepository.countByDepartmentId(id);if(count>0)throw new IllegalArgumentException("This department has "+count+" assigned user(s). Reassign them before deleting the department.");departmentRepository.delete(d);}
 }
