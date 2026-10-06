@@ -44,7 +44,7 @@ export const AccessDeniedPage: React.FC = () => {
       </div>
 
       <p className="mt-8 text-[11px] text-slate-400">
-        If you require elevated access, contact your tenant organization administrator.
+        If you need access to this area, contact your organization administrator.
       </p>
     </div>
   );
