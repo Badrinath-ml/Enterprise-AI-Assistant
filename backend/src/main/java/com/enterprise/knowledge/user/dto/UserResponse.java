@@ -1,7 +1,7 @@
 package com.enterprise.knowledge.user.dto;
 
 import com.enterprise.knowledge.user.AppUser;
-
+import java.time.Instant;
 import java.util.UUID;
 
 public record UserResponse(
@@ -10,16 +10,14 @@ public record UserResponse(
         String email,
         String role,
         UUID departmentId,
-        boolean active
+        boolean active,
+        Instant createdAt
 ) {
     public static UserResponse from(AppUser user) {
         return new UserResponse(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getRole().name(),
+                user.getId(), user.getName(), user.getEmail(), user.getRole().name(),
                 user.getDepartment() == null ? null : user.getDepartment().getId(),
-                user.isActive()
+                user.isActive(), user.getCreatedAt()
         );
     }
 }
