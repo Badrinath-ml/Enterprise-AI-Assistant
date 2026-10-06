@@ -50,6 +50,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
     if (!fullName) return setError('First and last name are required');
     if (!email.trim()) return setError('Email address is required');
     if (password.length < 8) return setError('Password must be at least 8 characters');
+    if (!isManager && role === 'MANAGER' && !departmentId) return setError('A manager must be assigned to a department');
     setIsLoading(true);
     try {
       const created = await userApi.createUser({ name: fullName, email: email.trim().toLowerCase(), password, role: isManager ? 'EMPLOYEE' : role, departmentId: departmentId || null });
