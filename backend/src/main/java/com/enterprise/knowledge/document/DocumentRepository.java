@@ -16,10 +16,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
         where d.tenant.id = :tenantId
           and (:status is null or d.status = :status)
           and (
-              :q is null
-              or lower(d.title) like lower(concat('%', :q, '%'))
-              or lower(coalesce(d.description, '')) like lower(concat('%', :q, '%'))
-              or lower(d.originalFileName) like lower(concat('%', :q, '%'))
+              coalesce(:q, '') = ''
+              or lower(d.title) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(coalesce(d.description, '')) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(d.originalFileName) like concat('%', lower(coalesce(:q, '')), '%')
           )
         order by d.updatedAt desc
         """)
@@ -36,10 +36,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           and d.department.id = :departmentFilter
           and (:status is null or d.status = :status)
           and (
-              :q is null
-              or lower(d.title) like lower(concat('%', :q, '%'))
-              or lower(coalesce(d.description, '')) like lower(concat('%', :q, '%'))
-              or lower(d.originalFileName) like lower(concat('%', :q, '%'))
+              coalesce(:q, '') = ''
+              or lower(d.title) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(coalesce(d.description, '')) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(d.originalFileName) like concat('%', lower(coalesce(:q, '')), '%')
           )
         order by d.updatedAt desc
         """)
@@ -57,10 +57,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
           and (d.department is null or d.department.id = :departmentId)
           and (:status is null or d.status = :status)
           and (
-              :q is null
-              or lower(d.title) like lower(concat('%', :q, '%'))
-              or lower(coalesce(d.description, '')) like lower(concat('%', :q, '%'))
-              or lower(d.originalFileName) like lower(concat('%', :q, '%'))
+              coalesce(:q, '') = ''
+              or lower(d.title) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(coalesce(d.description, '')) like concat('%', lower(coalesce(:q, '')), '%')
+              or lower(d.originalFileName) like concat('%', lower(coalesce(:q, '')), '%')
           )
         order by d.updatedAt desc
         """)
