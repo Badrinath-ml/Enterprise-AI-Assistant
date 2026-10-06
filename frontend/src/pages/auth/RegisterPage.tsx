@@ -13,8 +13,8 @@ export const RegisterPage: React.FC = () => {
   const { success, error: toastError } = useToast();
   const navigate = useNavigate();
 
-  const [organizationName, setOrganizationName] = useState('');
-  const [organizationSlug, setOrganizationSlug] = useState('');
+  const [tenantName, setOrganizationName] = useState('');
+  const [tenantSlug, setOrganizationSlug] = useState('');
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   const [name, setName] = useState('');
@@ -43,11 +43,11 @@ export const RegisterPage: React.FC = () => {
     setValidationErrors({});
 
     // Client-side validations
-    if (!organizationName.trim()) {
+    if (!tenantName.trim()) {
       setFormError('Organization name is required');
       return;
     }
-    if (!organizationSlug.trim()) {
+    if (!tenantSlug.trim()) {
       setFormError('Organization slug is required');
       return;
     }
@@ -67,14 +67,14 @@ export const RegisterPage: React.FC = () => {
     setIsLoading(true);
     try {
       await register({
-        organizationName: organizationName.trim(),
-        organizationSlug: organizationSlug.trim().toLowerCase(),
+        tenantName: tenantName.trim(),
+        tenantSlug: tenantSlug.trim().toLowerCase(),
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
       });
 
-      success('Organization and administrator account registered!', 'Registration Complete');
+      success('Organization and administrator account registered!', 'Organization Created');
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const apiErr = err as ApiError;
@@ -109,21 +109,21 @@ export const RegisterPage: React.FC = () => {
           <Input
             label="Organization Name"
             placeholder="Acme Corp"
-            value={organizationName}
+            value={tenantName}
             onChange={(e) => handleOrganizationNameChange(e.target.value)}
             leftIcon={<Building className="w-4 h-4" />}
-            error={validationErrors['organizationName']}
+            error={validationErrors['tenantName']}
             required
           />
 
           <Input
             label="Organization Slug"
             placeholder="acme"
-            value={organizationSlug}
+            value={tenantSlug}
             onChange={(e) => handleOrganizationSlugChange(e.target.value)}
             leftIcon={<Hash className="w-4 h-4" />}
             helperText="Used in login identifier"
-            error={validationErrors['organizationSlug']}
+            error={validationErrors['tenantSlug']}
             required
           />
         </div>
