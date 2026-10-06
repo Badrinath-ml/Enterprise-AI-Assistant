@@ -58,27 +58,36 @@ export const DocumentsPage: React.FC = () => {
   const load = async (targetPage = page) => {
     setLoading(true);
     try {
-      const [result, deps] = await Promise.all([
-        documentApi.getDocuments({
-          q: q.trim() || undefined,
-          status: (status || undefined) as DocumentStatus | undefined,
-          departmentId: isAdmin && departmentId ? departmentId : undefined,
-          page: targetPage,
-          size: 10,
-        }),
-        departmentApi.getDepartments(),
-      ]);
+      const result = await documentApi.getDocuments({
+        q: q.trim() || undefined,
+        status: (status || undefined) as DocumentStatus | undefined,
+        departmentId: isAdmin && departmentId ? departmentId : undefined,
+        page: targetPage,
+        size: 10,
+      });
       setDocuments(result.content);
       setPage(result.page);
       setTotalPages(result.totalPages);
       setTotal(result.totalElements);
-      setDepartments(deps);
     } catch (e) {
       error((e as { message?: string }).message || 'Unable to load documents.', 'Could not load documents');
     } finally { setLoading(false); }
   };
 
+  const loadDepartments = async () => {
+    if (!isAdmin) {
+      setDepartments([]);
+      return;
+    }
+    try {
+      setDepartments(await departmentApi.getDepartments());
+    } catch (e) {
+      error((e as { message?: string }).message || 'Unable to load departments.', 'Could not load departments');
+    }
+  };
+
   useEffect(() => { load(0); }, [q, status, departmentId, isAdmin, user?.departmentId]);
+  useEffect(() => { loadDepartments(); }, [isAdmin]);
 
   const openPreview = async (doc: DocumentResponse) => {
     try {
