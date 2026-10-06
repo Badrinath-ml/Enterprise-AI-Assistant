@@ -53,7 +53,7 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create New Department"
-      description="Add a department to organize users and access scopes within your tenant."
+      description="Add a department to organize people in your organization."
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isLoading}>
