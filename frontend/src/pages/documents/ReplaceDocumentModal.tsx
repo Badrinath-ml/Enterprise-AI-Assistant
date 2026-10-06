@@ -35,7 +35,7 @@ export const ReplaceDocumentModal: React.FC<{
     <form onSubmit={submit} className="space-y-4">
       <input type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" onChange={e => setFile(e.target.files?.[0] || null)} className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-700" />
       <p className="text-[11px] text-slate-400">PDF, DOCX, or TXT · maximum 25 MB</p>
-      <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" loading={saving} leftIcon={<FileUp className="w-4 h-4"/>}>Replace</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" isLoading={saving} leftIcon={<FileUp className="w-4 h-4"/>}>Replace</Button></div>
     </form>
   </Modal>;
 };

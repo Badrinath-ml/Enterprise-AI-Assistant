@@ -64,7 +64,7 @@ export const UploadDocumentModal: React.FC<{
         <textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} rows={3} placeholder="Optional description" className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-slate-200" />
       </div>
       <Select label="Department" value={departmentId} onChange={e => setDepartmentId(e.target.value)} disabled={!isAdmin} options={options} />
-      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" loading={saving} leftIcon={<FileUp className="w-4 h-4" />}>Upload</Button></div>
+      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" isLoading={saving} leftIcon={<FileUp className="w-4 h-4" />}>Upload</Button></div>
     </form>
   </Modal>;
 };

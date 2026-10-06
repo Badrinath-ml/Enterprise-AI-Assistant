@@ -60,7 +60,7 @@ export const EditDocumentModal: React.FC<{
         { value: 'REJECTED', label: 'Rejected' },
         { value: 'ARCHIVED', label: 'Archived' },
       ]} />
-      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" loading={saving}>Save changes</Button></div>
+      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" isLoading={saving}>Save changes</Button></div>
     </form>
   </Modal>;
 };
