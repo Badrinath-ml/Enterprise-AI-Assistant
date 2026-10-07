@@ -23,17 +23,15 @@ public class GeminiEmbeddingService implements EmbeddingService {
     private static final int BATCH_SIZE = 32;
 
     private final RestClient client;
-        private final String model;
+    private final String model;
+    private final String apiKey;
 
     public GeminiEmbeddingService(
             RestClient.Builder restClientBuilder,
             @Value("${app.ai.gemini.api-key:}") String apiKey,
             @Value("${app.ai.embedding.model:gemini-embedding-2}") String model) {
 
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("GEMINI_API_KEY is required for Gemini embeddings");
-        }
-
+        this.apiKey = apiKey;
         this.model = model;
         this.client = restClientBuilder
                 .baseUrl("https://generativelanguage.googleapis.com")
@@ -67,6 +65,9 @@ public class GeminiEmbeddingService implements EmbeddingService {
     }
 
     private List<float[]> batchEmbed(List<String> texts, boolean query) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("GEMINI_API_KEY is required for Gemini embeddings");
+        }
         List<Object> requests = new ArrayList<>(texts.size());
 
         for (String text : texts) {
@@ -76,7 +77,8 @@ public class GeminiEmbeddingService implements EmbeddingService {
 
             requests.add(new EmbedRequest(
                     "models/" + model,
-                    new Content(List.of(new Part(prepared))),
+                    new Content(List.of(new Part(text))),
+                    query ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
                     DIMENSIONS
             ));
         }
@@ -136,7 +138,7 @@ public class GeminiEmbeddingService implements EmbeddingService {
     }
 
     private record BatchEmbedRequest(List<Object> requests) {}
-    private record EmbedRequest(String model, Content content, int outputDimensionality) {}
+    private record EmbedRequest(String model, Content content, String taskType, int outputDimensionality) {}
     private record Content(List<Part> parts) {}
     private record Part(String text) {}
 }
