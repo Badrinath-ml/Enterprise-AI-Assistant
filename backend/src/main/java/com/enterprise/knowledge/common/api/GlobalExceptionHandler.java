@@ -45,6 +45,28 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<ApiError> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ApiError.of(403, "Forbidden", ex.getMessage() != null && !ex.getMessage().isBlank()
+                        ? ex.getMessage() : "You do not have permission to access this resource", request.getRequestURI())
+        );
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    ResponseEntity<ApiError> handleAuthentication(org.springframework.security.core.AuthenticationException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ApiError.of(401, "Unauthorized", ex.getMessage(), request.getRequestURI())
+        );
+    }
+
+    @ExceptionHandler({com.enterprise.knowledge.common.exception.ResourceNotFoundException.class, java.util.NoSuchElementException.class})
+    ResponseEntity<ApiError> handleNotFound(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ApiError.of(404, "Not Found", ex.getMessage(), request.getRequestURI())
+        );
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         return ResponseEntity.badRequest().body(

@@ -1,10 +1,13 @@
 package com.enterprise.knowledge.document.ingestion;
 
+import com.enterprise.knowledge.common.exception.ResourceNotFoundException;
 import com.enterprise.knowledge.document.Document;
 import com.enterprise.knowledge.document.DocumentRepository;
 import com.enterprise.knowledge.document.IngestionStatus;
 import com.enterprise.knowledge.document.dto.DocumentIngestionResponse;
 import com.enterprise.knowledge.document.storage.FileStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -12,13 +15,16 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class DocumentIngestionService {
+    private static final Logger log = LoggerFactory.getLogger(DocumentIngestionService.class);
+
     private final DocumentRepository documentRepository;
     private final DocumentChunkRepository chunkRepository;
     private final FileStorageService storage;
@@ -41,13 +47,16 @@ public class DocumentIngestionService {
     }
 
     @Async("documentIngestionExecutor")
-    public void queue(UUID tenantId, UUID documentId) { process(tenantId, documentId); }
+    public void queue(UUID tenantId, UUID documentId) {
+        process(tenantId, documentId);
+    }
 
     @Transactional
     public void markQueued(UUID tenantId, UUID documentId) {
         Document d = find(tenantId, documentId);
         d.setIngestionStatus(IngestionStatus.QUEUED);
         d.setIngestionError(null);
+        documentRepository.save(d);
     }
 
     public void process(UUID tenantId, UUID documentId) {
@@ -56,21 +65,24 @@ public class DocumentIngestionService {
         try {
             markProcessing(tenantId, documentId);
             Resource resource = storage.loadAsResource(d.getStorageKey());
-            byte[] bytes = resource.getInputStream().readAllBytes();
-            ExtractedDocument extracted = extractor.extract(bytes, d.getOriginalFileName(), d.getMimeType());
-
-            List<ChunkSource> sources = new ArrayList<>();
-            for (ExtractedDocument.ExtractedPage page : extracted.pages()) {
-                for (String chunk : chunker.split(page.text())) {
-                    sources.add(new ChunkSource(chunk, page.pageNumber()));
-                }
+            ExtractedDocument extracted;
+            try (InputStream inputStream = resource.getInputStream()) {
+                extracted = extractor.extract(inputStream, d.getOriginalFileName(), d.getMimeType());
             }
-            if (sources.isEmpty()) throw new IllegalArgumentException("Document contains no extractable text");
 
-            replaceChunks(tenantId, documentId, version, d.getTitle(), sources);
-            markIndexed(tenantId, documentId, version, sources.size());
+            List<TextChunker.DocumentChunkItem> chunkItems = chunker.chunkPages(extracted.pages());
+            if (chunkItems.isEmpty()) {
+                throw new IllegalArgumentException("Document contains no extractable text");
+            }
+
+            replaceChunks(tenantId, documentId, version, d.getTitle(), chunkItems);
+            markIndexed(tenantId, documentId, version, chunkItems.size());
+            log.info("Document successfully indexed: id={}, version={}, chunks={}", documentId, version, chunkItems.size());
         } catch (Exception e) {
-            markFailed(tenantId, documentId, e.getMessage());
+            String errorMsg = e.getMessage() != null && !e.getMessage().isBlank()
+                    ? e.getMessage() : e.getClass().getSimpleName();
+            log.error("Document ingestion failed for id={}: {}", documentId, errorMsg, e);
+            markFailed(tenantId, documentId, errorMsg);
         }
     }
 
@@ -81,28 +93,32 @@ public class DocumentIngestionService {
         documentRepository.save(d);
     }
 
-    protected void replaceChunks(UUID tenantId, UUID documentId, int version, String title, List<ChunkSource> sources) {
+    protected void replaceChunks(UUID tenantId, UUID documentId, int version, String title,
+                                 List<TextChunker.DocumentChunkItem> chunkItems) {
         String documentTitle = title == null || title.isBlank() ? "none" : title.trim();
         List<float[]> embeddings = embeddingService.embedDocuments(
-                sources.stream()
-                        .map(source -> "title: " + documentTitle + " | text: " + source.content())
+                chunkItems.stream()
+                        .map(item -> "title: " + documentTitle + " | text: " + item.content())
                         .toList()
         );
-        if (embeddings.size() != sources.size()) {
+        if (embeddings.size() != chunkItems.size()) {
             throw new IllegalStateException("Embedding provider returned an unexpected number of vectors");
         }
         transactionTemplate.executeWithoutResult(status -> {
             chunkRepository.deleteForDocument(documentId);
-            for (int i = 0; i < sources.size(); i++) {
+            for (int i = 0; i < chunkItems.size(); i++) {
                 float[] embedding = embeddings.get(i);
                 if (embedding.length != embeddingService.dimensions()) {
                     throw new IllegalStateException("Embedding dimension does not match configured dimension");
                 }
-                ChunkSource source = sources.get(i);
-                chunkRepository.insert(tenantId, documentId, version, i, source.content(),
-                        estimateTokenCount(source.content()), embedding,
+                TextChunker.DocumentChunkItem item = chunkItems.get(i);
+                UUID chunkId = UUID.nameUUIDFromBytes(
+                        (documentId.toString() + ":v" + version + ":c" + item.chunkIndex()).getBytes(StandardCharsets.UTF_8)
+                );
+                chunkRepository.insert(chunkId, tenantId, documentId, version, item.chunkIndex(), item.content(),
+                        item.tokenCount(), embedding,
                         embeddingService.provider(), embeddingService.model(),
-                        source.pageNumber(), "Page " + source.pageNumber());
+                        item.pageNumber(), item.sourceLocator());
             }
         });
     }
@@ -138,12 +154,6 @@ public class DocumentIngestionService {
 
     private Document find(UUID tenantId, UUID documentId) {
         return documentRepository.findByIdAndTenantId(documentId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
     }
-
-    private int estimateTokenCount(String text) {
-        return Math.max(1, text.trim().split("\\s+").length);
-    }
-
-    private record ChunkSource(String content, int pageNumber) {}
 }

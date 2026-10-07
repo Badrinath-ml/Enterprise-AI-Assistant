@@ -1,9 +1,11 @@
 package com.enterprise.knowledge.document;
 
+import com.enterprise.knowledge.common.exception.ResourceNotFoundException;
 import com.enterprise.knowledge.department.Department;
 import com.enterprise.knowledge.department.DepartmentRepository;
 import com.enterprise.knowledge.document.dto.DocumentPageResponse;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
+import com.enterprise.knowledge.document.dto.DocumentStatsResponse;
 import com.enterprise.knowledge.document.dto.UpdateDocumentRequest;
 import com.enterprise.knowledge.document.storage.FileStorageService;
 import com.enterprise.knowledge.document.ingestion.DocumentIngestionRequestedEvent;
@@ -14,6 +16,8 @@ import com.enterprise.knowledge.user.UserRole;
 import com.enterprise.knowledge.user.UserService;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.*;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -59,34 +63,15 @@ public class DocumentService {
         UUID scopeDepartment = actor.getDepartment() == null ? null : actor.getDepartment().getId();
 
         if (!admin && departmentFilter != null && !departmentFilter.equals(scopeDepartment)) {
-            throw new IllegalArgumentException("You can only browse documents in your department");
+            throw new AccessDeniedException("You can only browse documents in your department");
         }
 
-        Pageable pageable = PageRequest.of(safePage, safeSize);
-        String search = q == null || q.isBlank() ? "" : q.trim();
-        Page<Document> result;
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        Specification<Document> spec = DocumentSpecifications.forSearch(
+                tenantId, admin, scopeDepartment, departmentFilter, status, q
+        );
+        Page<Document> result = documentRepository.findAll(spec, pageable);
 
-        if (admin) {
-            if (departmentFilter == null) {
-                result = status == null
-                        ? documentRepository.searchAdmin(tenantId, search, pageable)
-                        : documentRepository.searchAdminByStatus(tenantId, status, search, pageable);
-            } else {
-                result = status == null
-                        ? documentRepository.searchAdminByDepartment(tenantId, departmentFilter, search, pageable)
-                        : documentRepository.searchAdminByDepartmentAndStatus(
-                                tenantId, departmentFilter, status, search, pageable);
-            }
-        } else {
-            if (scopeDepartment == null) {
-                result = Page.empty(pageable);
-            } else {
-                result = status == null
-                        ? documentRepository.searchDepartment(tenantId, scopeDepartment, search, pageable)
-                        : documentRepository.searchDepartmentByStatus(
-                                tenantId, scopeDepartment, status, search, pageable);
-            }
-        }
         return new DocumentPageResponse(
                 result.getContent().stream().map(DocumentResponse::from).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages()
@@ -221,14 +206,23 @@ public class DocumentService {
         return getAccessible(tenantId, actor, documentId);
     }
 
+    @Transactional(readOnly = true)
+    public DocumentStatsResponse getStats(UUID tenantId) {
+        long total = documentRepository.countByTenantId(tenantId);
+        long approved = documentRepository.countByTenantIdAndStatus(tenantId, DocumentStatus.APPROVED);
+        long indexed = documentRepository.countByTenantIdAndIngestionStatus(tenantId, IngestionStatus.INDEXED);
+        long failed = documentRepository.countByTenantIdAndIngestionStatus(tenantId, IngestionStatus.FAILED);
+        return new DocumentStatsResponse(total, approved, indexed, failed);
+    }
+
     private Document getAccessible(UUID tenantId, AppUser actor, UUID documentId) {
         Document document = documentRepository.findByIdAndTenantId(documentId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
         if (actor.getRole() == UserRole.ADMIN) return document;
         UUID actorDept = actor.getDepartment() == null ? null : actor.getDepartment().getId();
         UUID documentDept = document.getDepartment() == null ? null : document.getDepartment().getId();
         if (documentDept != null && !documentDept.equals(actorDept)) {
-            throw new IllegalArgumentException("You do not have access to this document");
+            throw new AccessDeniedException("You do not have access to this document");
         }
         return document;
     }
@@ -236,12 +230,12 @@ public class DocumentService {
     private void requireCanManage(AppUser actor, Document document) {
         if (actor.getRole() == UserRole.ADMIN) return;
         if (actor.getRole() != UserRole.MANAGER) {
-            throw new IllegalArgumentException("Only administrators and managers can manage documents");
+            throw new AccessDeniedException("Only administrators and managers can manage documents");
         }
         UUID actorDept = actor.getDepartment() == null ? null : actor.getDepartment().getId();
         UUID documentDept = document.getDepartment() == null ? null : document.getDepartment().getId();
         if (actorDept == null || documentDept == null || !actorDept.equals(documentDept)) {
-            throw new IllegalArgumentException("Managers can only manage documents in their own department");
+            throw new AccessDeniedException("Managers can only manage documents in their own department");
         }
     }
 
@@ -251,18 +245,18 @@ public class DocumentService {
                 throw new IllegalArgumentException("Manager is not assigned to a department");
             }
             if (departmentId != null && !departmentId.equals(actor.getDepartment().getId())) {
-                throw new IllegalArgumentException("Managers can only use their own department");
+                throw new AccessDeniedException("Managers can only use their own department");
             }
             return actor.getDepartment();
         }
         if (departmentId == null) return null;
         return departmentRepository.findByIdAndTenantId(departmentId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Department not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
     }
 
     private void requireManagerOrAdmin(AppUser actor) {
         if (actor.getRole() != UserRole.ADMIN && actor.getRole() != UserRole.MANAGER) {
-            throw new IllegalArgumentException("Only administrators and managers can upload documents");
+            throw new AccessDeniedException("Only administrators and managers can upload documents");
         }
     }
 

@@ -28,6 +28,12 @@ public class Tenant {
         this.slug = slug;
     }
 
+    public Tenant(UUID id, String name, String slug) {
+        this.id = id;
+        this.name = name;
+        this.slug = slug;
+    }
+
     public UUID getId() { return id; }
     public String getName() { return name; }
     public String getSlug() { return slug; }

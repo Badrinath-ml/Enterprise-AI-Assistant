@@ -136,16 +136,51 @@ export const DocumentsPage: React.FC = () => {
   const filteredCountLabel = useMemo(() => total === 1 ? '1 document' : `${total} documents`, [total]);
 
   const statusBadge = (s: DocumentStatus) => {
-    const labels: Record<DocumentStatus, string> = {
-      DRAFT: 'Draft', PENDING_REVIEW: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected', ARCHIVED: 'Archived',
-    };
-    return <span className="inline-flex px-2 py-0.5 rounded border text-[11px] font-medium bg-slate-50 text-slate-600 border-slate-200">{labels[s]}</span>;
+    switch (s) {
+      case 'APPROVED': return <Badge variant="success">Approved</Badge>;
+      case 'PENDING_REVIEW': return <Badge variant="warning">Pending</Badge>;
+      case 'REJECTED': return <Badge variant="error">Rejected</Badge>;
+      case 'ARCHIVED': return <Badge variant="neutral">Archived</Badge>;
+      case 'DRAFT':
+      default: return <Badge variant="default">Draft</Badge>;
+    }
+  };
+
+  const ingestionBadge = (doc: DocumentResponse) => {
+    switch (doc.ingestionStatus) {
+      case 'INDEXED':
+        return <Badge variant="blue" className="normal-case">Indexed ({doc.indexedChunkCount} chunks)</Badge>;
+      case 'PROCESSING':
+        return <Badge variant="warning" className="normal-case animate-pulse">Processing...</Badge>;
+      case 'QUEUED':
+        return <Badge variant="default" className="normal-case">Queued</Badge>;
+      case 'FAILED':
+        return (
+          <span title={doc.ingestionError || 'Ingestion failed'}>
+            <Badge variant="error" className="normal-case cursor-help">Failed</Badge>
+          </span>
+        );
+      case 'NOT_INDEXED':
+      default:
+        return <Badge variant="neutral" className="normal-case">Not Indexed</Badge>;
+    }
+  };
+
+  const retryIngestion = async (doc: DocumentResponse) => {
+    try {
+      await documentApi.retryIngestion(doc.id);
+      success(`Ingestion queued for "${doc.title}".`, 'Ingestion Queued');
+      await load(page);
+    } catch (e) {
+      error((e as { message?: string }).message || 'Unable to retry ingestion.', 'Retry Failed');
+    }
   };
 
   const columns: Column<DocumentResponse>[] = [
     { key: 'title', header: 'Document', render: d => <div className="flex items-center gap-2.5"><div className="p-1.5 rounded-md bg-slate-100 text-slate-600"><FileText className="w-4 h-4"/></div><div className="min-w-0"><div className="font-semibold text-slate-900 text-xs truncate max-w-[260px]">{d.title}</div><div className="text-[11px] text-slate-500 truncate max-w-[260px]">{d.originalFileName} · v{d.version}</div></div></div> },
     { key: 'department', header: 'Department', render: d => <span className="text-xs text-slate-700">{d.departmentName || 'Organization-wide'}</span> },
     { key: 'status', header: 'Status', render: d => statusBadge(d.status) },
+    { key: 'ingestion', header: 'AI Indexing', render: d => ingestionBadge(d) },
     { key: 'size', header: 'Size', render: d => <span className="text-xs text-slate-500">{formatSize(d.fileSize)}</span> },
     { key: 'updatedAt', header: 'Updated', render: d => <span className="text-xs text-slate-500">{formatDate(d.updatedAt)}</span> },
     { key: 'actions', header: '', align: 'right', render: d => <Dropdown trigger={<button className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label={`Actions for ${d.title}`}><MoreHorizontal className="w-4 h-4"/></button>} items={[
@@ -162,6 +197,9 @@ export const DocumentsPage: React.FC = () => {
               error((e as { message?: string }).message || 'Unable to approve document.', 'Approval Failed');
             }
           } }
+        ] : []),
+        ...(d.ingestionStatus === 'FAILED' ? [
+          { label: 'Retry Indexing', icon: <RefreshCw className="w-4 h-4"/>, onClick: () => retryIngestion(d) }
         ] : []),
         { label: 'Edit details', icon: <Pencil className="w-4 h-4"/>, onClick: () => setEditing(d) },
         { label: 'Replace file', icon: <Replace className="w-4 h-4"/>, onClick: () => setReplacing(d) },

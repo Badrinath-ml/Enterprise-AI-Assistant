@@ -52,11 +52,17 @@ public class ChatRetrievalService {
             params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
                     embeddingService.model(), embeddingService.dimensions(), literal, topK};
         } else {
-            if (departmentId == null) return List.of();
-            sql += " AND (d.department_id IS NULL OR d.department_id = ?)";
-            sql += " ORDER BY c.embedding <=> ?::vector LIMIT ?";
-            params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
-                    embeddingService.model(), embeddingService.dimensions(), departmentId, literal, topK};
+            if (departmentId != null) {
+                sql += " AND (d.department_id IS NULL OR d.department_id = ?)";
+                sql += " ORDER BY c.embedding <=> ?::vector LIMIT ?";
+                params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
+                        embeddingService.model(), embeddingService.dimensions(), departmentId, literal, topK};
+            } else {
+                sql += " AND d.department_id IS NULL";
+                sql += " ORDER BY c.embedding <=> ?::vector LIMIT ?";
+                params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
+                        embeddingService.model(), embeddingService.dimensions(), literal, topK};
+            }
         }
         List<RetrievedChunk> candidates = jdbcTemplate.query(sql, params, (rs, rowNum) -> new RetrievedChunk(
                 rs.getObject("chunk_id", UUID.class),

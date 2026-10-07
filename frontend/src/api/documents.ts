@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { DocumentPageResponse, DocumentResponse, DocumentStatus, UpdateDocumentRequest } from '../types/document';
+import { DocumentPageResponse, DocumentResponse, DocumentStatsResponse, DocumentStatus, UpdateDocumentRequest } from '../types/document';
 
 export const documentApi = {
   async getDocuments(params: {
@@ -58,6 +58,21 @@ export const documentApi = {
       `/api/v1/documents/${id}/${download ? 'download' : 'content'}`,
       { responseType: 'blob' }
     );
+    return response.data;
+  },
+
+  async retryIngestion(id: string) {
+    const response = await apiClient.post(`/api/v1/documents/${id}/ingestion`);
+    return response.data;
+  },
+
+  async getIngestionStatus(id: string) {
+    const response = await apiClient.get(`/api/v1/documents/${id}/ingestion`);
+    return response.data;
+  },
+
+  async getStats(): Promise<DocumentStatsResponse> {
+    const response = await apiClient.get<DocumentStatsResponse>('/api/v1/documents/stats');
     return response.data;
   },
 };

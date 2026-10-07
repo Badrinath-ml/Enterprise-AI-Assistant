@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import { storage } from '../utils/storage';
-import { ChatConversation, ChatHistory, ChatSendResponse, ChatSource, IngestionResponse } from '../types/chat';
+import { ChatCitation, ChatConversation, ChatHistory, ChatSendResponse, ChatSource, IngestionResponse } from '../types/chat';
 
 export const chatApi = {
   async getConversations(): Promise<ChatConversation[]> {
@@ -29,6 +29,7 @@ export const chatApi = {
     id: string,
     message: string,
     onToken: (token: string) => void,
+    onCitation?: (citation: ChatCitation) => void,
   ): Promise<void> {
     const token = storage.getToken();
     const base = import.meta.env.VITE_API_URL || '';
@@ -65,10 +66,28 @@ export const chatApi = {
           .join('\n');
 
         if (!data) continue;
+
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          parsed = data;
+        }
+
         if (eventType === 'token') {
-          onToken(data);
+          const text = typeof parsed === 'object' && parsed !== null && 'text' in parsed
+            ? String((parsed as { text: unknown }).text)
+            : data;
+          onToken(text);
+        } else if (eventType === 'citation') {
+          if (onCitation && typeof parsed === 'object' && parsed !== null) {
+            onCitation(parsed as ChatCitation);
+          }
         } else if (eventType === 'error') {
-          throw new Error(data);
+          const msg = typeof parsed === 'object' && parsed !== null && 'message' in parsed
+            ? String((parsed as { message: unknown }).message)
+            : data;
+          throw new Error(msg);
         }
       }
     }

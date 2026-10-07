@@ -91,11 +91,22 @@ export const ChatPage: React.FC = () => {
     setMessages(prev => [...prev, userMessage, assistantMessage]);
 
     try {
-      await chatApi.stream(active.id, value, token => {
-        setMessages(prev => prev.map(m =>
-          m.id === assistantId ? { ...m, content: m.content + token } : m
-        ));
-      });
+      await chatApi.stream(
+        active.id,
+        value,
+        token => {
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, content: m.content + token } : m
+          ));
+        },
+        citation => {
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId && !m.citations.some(c => c.id === citation.id)
+              ? { ...m, citations: [...m.citations, citation] }
+              : m
+          ));
+        }
+      );
 
       // Server is the source of truth: reload the persisted turn, citations and history.
       await loadHistory(active);
@@ -212,10 +223,27 @@ export const ChatPage: React.FC = () => {
               </div>
             ))
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <Sparkles className="w-8 h-8 text-slate-300"/>
-              <p className="mt-3 text-sm font-medium text-slate-700">What would you like to know?</p>
-              <p className="text-xs text-slate-400 mt-1">Ask about your approved organization documents.</p>
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto py-10">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 mb-3">
+                <Sparkles className="w-5 h-5"/>
+              </div>
+              <p className="text-base font-semibold text-slate-900">What would you like to know?</p>
+              <p className="text-xs text-slate-500 mt-1">Ask questions about approved organization documents to receive grounded answers with citations.</p>
+              <div className="mt-6 flex flex-col sm:flex-row gap-2 w-full justify-center">
+                {[
+                  "What are our security and data privacy policies?",
+                  "What is the document approval process?",
+                  "Summarize key operational guidelines."
+                ].map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => { setInput(suggestion); }}
+                    className="text-left text-xs p-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 transition-colors shadow-xs"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {loading && <div className="flex items-center gap-2 text-xs text-slate-400"><Sparkles className="w-4 h-4"/>Thinking...</div>}

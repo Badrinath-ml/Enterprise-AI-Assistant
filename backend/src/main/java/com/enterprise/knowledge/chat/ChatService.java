@@ -124,10 +124,13 @@ public class ChatService {
                 .collect(java.util.stream.Collectors.joining("\n"));
 
         String system = """
-                You are the Enterprise Knowledge Assistant.
-                Answer using the supplied enterprise sources. Do not invent facts.
-                If the sources do not contain enough evidence, say that clearly.
-                Prefer concise, useful answers.
+                You are the Enterprise Knowledge Assistant, an enterprise AI assistant dedicated to answering questions accurately and professionally based strictly on authorized organizational knowledge.
+
+                Guidelines:
+                1. Grounding: Answer using the provided retrieved enterprise sources.
+                2. Citations: Reference source documents and page numbers where available.
+                3. Insufficient evidence: If the retrieved sources do not contain enough information to answer the question, clearly state: "The available organizational documents do not contain enough information to answer this question." Do not invent company policy or facts.
+                4. Tone: Professional, clear, concise, and helpful.
                 """;
 
         String promptWithContext = """
@@ -200,10 +203,13 @@ public class ChatService {
                         .collect(java.util.stream.Collectors.joining("\n"));
 
                 String system = """
-                        You are the Enterprise Knowledge Assistant.
-                        Answer using the supplied enterprise sources. Do not invent facts.
-                        If the sources do not contain enough evidence, say that clearly.
-                        Prefer concise, useful answers.
+                        You are the Enterprise Knowledge Assistant, an enterprise AI assistant dedicated to answering questions accurately and professionally based strictly on authorized organizational knowledge.
+
+                        Guidelines:
+                        1. Grounding: Answer using the provided retrieved enterprise sources.
+                        2. Citations: Reference source documents and page numbers where available.
+                        3. Insufficient evidence: If the retrieved sources do not contain enough information to answer the question, clearly state: "The available organizational documents do not contain enough information to answer this question." Do not invent company policy or facts.
+                        4. Tone: Professional, clear, concise, and helpful.
                         """;
 
                 String promptWithContext = """
@@ -220,11 +226,31 @@ public class ChatService {
                         context.isBlank() ? "(no matching approved indexed source)" : context,
                         prompt.trim());
 
+                // Emit citations to client early so citations are visible immediately
+                for (ChatRetrievalService.RetrievedChunk chunk : chunks) {
+                    ChatCitationResponse citation = new ChatCitationResponse(
+                            UUID.randomUUID(),
+                            chunk.documentId(),
+                            chunk.title(),
+                            chunk.fileName(),
+                            chunk.mimeType(),
+                            chunk.documentVersion(),
+                            chunk.chunkId(),
+                            chunk.chunkIndex(),
+                            chunk.similarity(),
+                            Math.max(0, Math.min(1, chunk.similarity())),
+                            chunk.content(),
+                            chunk.pageNumber(),
+                            chunk.locatorLabel()
+                    );
+                    emitter.send(SseEmitter.event().name("citation").data(citation));
+                }
+
                 GenerationResponse generated = streamingGeneration.stream(
                         new GenerationRequest(system, promptWithContext),
                         token -> {
                             try {
-                                emitter.send(SseEmitter.event().name("token").data(token));
+                                emitter.send(SseEmitter.event().name("token").data(new StreamTokenResponse(token)));
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
                             }
@@ -240,12 +266,10 @@ public class ChatService {
                 emitter.complete();
             } catch (Exception e) {
                 try {
-                    emitter.send(SseEmitter.event().name("error").data(
-                            e.getMessage() == null ? "Unable to generate an answer." : e.getMessage()));
+                    String errorMsg = e.getMessage() == null || e.getMessage().isBlank()
+                            ? "Unable to generate an answer right now." : e.getMessage();
+                    emitter.send(SseEmitter.event().name("error").data(new StreamErrorResponse(errorMsg)));
                 } catch (Exception ignored) {}
-                // The error has already been delivered as an SSE event.
-                // Completing normally avoids Spring MVC trying to serialize ApiError
-                // into an already-committed text/event-stream response.
                 emitter.complete();
             } finally {
                 executor.shutdown();
@@ -254,6 +278,8 @@ public class ChatService {
         return emitter;
     }
 
+    public record StreamTokenResponse(String text) {}
+    public record StreamErrorResponse(String message) {}
     public record StreamDoneResponse(UUID conversationId, String provider, String model) {}
 
     @Transactional

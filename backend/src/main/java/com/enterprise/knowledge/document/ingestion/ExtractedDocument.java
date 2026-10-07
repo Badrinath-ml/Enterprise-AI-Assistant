@@ -11,5 +11,9 @@ public record ExtractedDocument(List<ExtractedPage> pages) {
         return String.join("\n\n", pages.stream().map(ExtractedPage::text).toList());
     }
 
-    public record ExtractedPage(int pageNumber, String text) {}
+    public record ExtractedPage(int pageNumber, String sectionTitle, String text) {
+        public ExtractedPage(int pageNumber, String text) {
+            this(pageNumber, null, text);
+        }
+    }
 }

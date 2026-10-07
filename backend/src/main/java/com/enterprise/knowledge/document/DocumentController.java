@@ -43,6 +43,13 @@ public class DocumentController {
         );
     }
 
+    @GetMapping("/stats")
+    @PreAuthorize("isAuthenticated()")
+    public com.enterprise.knowledge.document.dto.DocumentStatsResponse stats(
+            @AuthenticationPrincipal Jwt jwt) {
+        return documentService.getStats(TenantContext.getRequired());
+    }
+
     @GetMapping("/{id}/ingestion")
     @PreAuthorize("isAuthenticated()")
     public DocumentIngestionResponse ingestionStatus(

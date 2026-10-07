@@ -82,38 +82,53 @@ public class GeminiEmbeddingService implements EmbeddingService {
             ));
         }
 
-        try {
-            JsonNode root = client.post()
-                    .uri("/v1beta/models/{model}:batchEmbedContents", model)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(new BatchEmbedRequest(requests))
-                    .retrieve()
-                    .body(JsonNode.class);
+        int maxAttempts = 3;
+        RuntimeException lastException = null;
 
-            JsonNode embeddings = root == null ? null : root.get("embeddings");
-            if (embeddings == null || !embeddings.isArray() || embeddings.size() != texts.size()) {
-                throw new IllegalStateException("Gemini returned an unexpected embedding response");
-            }
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                JsonNode root = client.post()
+                        .uri("/v1beta/models/{model}:batchEmbedContents", model)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(new BatchEmbedRequest(requests))
+                        .retrieve()
+                        .body(JsonNode.class);
 
-            List<float[]> vectors = new ArrayList<>(embeddings.size());
-            for (JsonNode embedding : embeddings) {
-                JsonNode values = embedding.get("values");
-                if (values == null || !values.isArray() || values.size() != DIMENSIONS) {
-                    throw new IllegalStateException(
-                            "Gemini embedding dimension does not match pgvector dimension " + DIMENSIONS
-                    );
+                JsonNode embeddings = root == null ? null : root.get("embeddings");
+                if (embeddings == null || !embeddings.isArray() || embeddings.size() != texts.size()) {
+                    throw new IllegalStateException("Gemini returned an unexpected embedding response");
                 }
 
-                float[] vector = new float[DIMENSIONS];
-                for (int i = 0; i < DIMENSIONS; i++) {
-                    vector[i] = (float) values.get(i).asDouble();
+                List<float[]> vectors = new ArrayList<>(embeddings.size());
+                for (JsonNode embedding : embeddings) {
+                    JsonNode values = embedding.get("values");
+                    if (values == null || !values.isArray() || values.size() != DIMENSIONS) {
+                        throw new IllegalStateException(
+                                "Gemini embedding dimension does not match pgvector dimension " + DIMENSIONS
+                        );
+                    }
+
+                    float[] vector = new float[DIMENSIONS];
+                    for (int i = 0; i < DIMENSIONS; i++) {
+                        vector[i] = (float) values.get(i).asDouble();
+                    }
+                    vectors.add(vector);
                 }
-                vectors.add(vector);
+                return vectors;
+            } catch (RuntimeException e) {
+                lastException = e;
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(attempt * 1000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Gemini embedding retry interrupted", ie);
+                    }
+                }
             }
-            return vectors;
-        } catch (RuntimeException e) {
-            throw new IllegalStateException("Gemini embedding request failed: " + safeMessage(e), e);
         }
+
+        throw new IllegalStateException("Gemini embedding request failed after " + maxAttempts + " attempts: " + safeMessage(lastException), lastException);
     }
 
     private String safeMessage(Exception e) {

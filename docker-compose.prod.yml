@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: eka-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-knowledge_assistant}
+      POSTGRES_USER: ${DB_USER:-knowledge}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-knowledge_secret_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-knowledge} -d ${DB_NAME:-knowledge_assistant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eka-backend-prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-knowledge_assistant}
+      DB_USERNAME: ${DB_USER:-knowledge}
+      DB_PASSWORD: ${DB_PASSWORD:-knowledge_secret_password}
+      JWT_SECRET: ${JWT_SECRET:-please_set_a_strong_production_secret_32_bytes_min}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DOCUMENT_STORAGE_PATH: /app/storage/documents
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend_storage:/app/storage/documents
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    container_name: eka-frontend-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_prod_data:
+  backend_storage:

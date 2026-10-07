@@ -42,7 +42,7 @@ public class LocalFileStorageService implements FileStorageService {
         try (InputStream input = file.getInputStream()) {
             Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
         }
-        String storageKey = root.relativize(target).toString().replace('\'', '/');
+        String storageKey = root.relativize(target).toString().replace('\\', '/');
         return new StoredFile(storageKey, original, file.getContentType(), file.getSize());
     }
 
