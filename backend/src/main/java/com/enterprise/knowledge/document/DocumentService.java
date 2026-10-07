@@ -7,6 +7,7 @@ import com.enterprise.knowledge.document.dto.DocumentResponse;
 import com.enterprise.knowledge.document.dto.UpdateDocumentRequest;
 import com.enterprise.knowledge.document.storage.FileStorageService;
 import com.enterprise.knowledge.document.ingestion.DocumentIngestionService;
+import com.enterprise.knowledge.document.ingestion.DocumentIngestionRequestedEvent;
 import com.enterprise.knowledge.tenant.Tenant;
 import com.enterprise.knowledge.tenant.TenantRepository;
 import com.enterprise.knowledge.user.AppUser;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -32,19 +34,22 @@ public class DocumentService {
     private final UserService userService;
     private final FileStorageService storage;
     private final DocumentIngestionService ingestionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public DocumentService(DocumentRepository documentRepository,
                            DepartmentRepository departmentRepository,
                            TenantRepository tenantRepository,
                            UserService userService,
                            FileStorageService storage,
-                           DocumentIngestionService ingestionService) {
+                           DocumentIngestionService ingestionService,
+                           ApplicationEventPublisher eventPublisher) {
         this.documentRepository = documentRepository;
         this.departmentRepository = departmentRepository;
         this.tenantRepository = tenantRepository;
         this.userService = userService;
         this.storage = storage;
         this.ingestionService = ingestionService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -115,9 +120,9 @@ public class DocumentService {
                     stored.originalFileName(), stored.storageKey(), normalizedMime(file, stored.originalFileName()),
                     stored.size()
             );
+            document.setIngestionStatus(IngestionStatus.QUEUED);
             documentRepository.save(document);
-            ingestionService.markQueued(tenantId, documentId);
-            ingestionService.queue(tenantId, documentId);
+            eventPublisher.publishEvent(new DocumentIngestionRequestedEvent(tenantId, documentId));
             return DocumentResponse.from(document);
         } catch (IOException | RuntimeException e) {
             if (stored != null) {
@@ -159,9 +164,9 @@ public class DocumentService {
                     stored.originalFileName(), stored.storageKey(),
                     normalizedMime(file, stored.originalFileName()), stored.size()
             );
+            document.setIngestionStatus(IngestionStatus.QUEUED);
             DocumentResponse response = DocumentResponse.from(documentRepository.save(document));
-            ingestionService.markQueued(tenantId, documentId);
-            ingestionService.queue(tenantId, documentId);
+            eventPublisher.publishEvent(new DocumentIngestionRequestedEvent(tenantId, documentId));
             try { storage.delete(oldKey); } catch (IOException ignored) {}
             return response;
         } catch (IOException | RuntimeException e) {
