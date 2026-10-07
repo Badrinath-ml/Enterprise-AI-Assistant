@@ -129,6 +129,16 @@ public class DocumentService {
     }
 
     @Transactional
+    public DocumentResponse createChatAttachment(UUID tenantId, UUID actorId, MultipartFile file) {
+        DocumentResponse response = create(tenantId, actorId, file, file.getOriginalFilename(),
+                "Uploaded from the Enterprise Assistant chat.", null);
+        Document document = documentRepository.findByIdAndTenantId(response.id(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+        document.setStatus(DocumentStatus.APPROVED);
+        return DocumentResponse.from(documentRepository.save(document));
+    }
+
+    @Transactional
     public DocumentResponse update(UUID tenantId, UUID actorId, UUID documentId,
                                    UpdateDocumentRequest request) {
         AppUser actor = userService.findByIdAndTenant(actorId, tenantId);
