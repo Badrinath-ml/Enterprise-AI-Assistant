@@ -154,6 +154,15 @@ public class DocumentService {
     }
 
     @Transactional
+    public DocumentResponse approve(UUID tenantId, UUID actorId, UUID documentId) {
+        AppUser actor = userService.findByIdAndTenant(actorId, tenantId);
+        Document document = getAccessible(tenantId, actor, documentId);
+        requireCanManage(actor, document);
+        document.setStatus(DocumentStatus.APPROVED);
+        return DocumentResponse.from(documentRepository.save(document));
+    }
+
+    @Transactional
     public DocumentResponse replaceContent(UUID tenantId, UUID actorId, UUID documentId,
                                            MultipartFile file) {
         AppUser actor = userService.findByIdAndTenant(actorId, tenantId);
