@@ -80,7 +80,8 @@ public class GeminiEmbeddingService implements EmbeddingService {
 
             requests.add(new EmbedRequest(
                     "models/" + model,
-                    new Content(new Part(prepared))
+                    new Content(List.of(new Part(prepared))),
+                    DIMENSIONS
             ));
         }
 
@@ -139,7 +140,7 @@ public class GeminiEmbeddingService implements EmbeddingService {
     }
 
     private record BatchEmbedRequest(List<Object> requests) {}
-    private record EmbedRequest(String model, Content content) {}
-    private record Content(Part parts) {}
+    private record EmbedRequest(String model, Content content, int outputDimensionality) {}
+    private record Content(List<Part> parts) {}
     private record Part(String text) {}
 }
