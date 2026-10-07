@@ -9,7 +9,7 @@ Turn uploaded enterprise documents into searchable vector knowledge while keepin
 - PDF, DOCX, and TXT text extraction
 - text normalization
 - overlapping text chunking
-- local Ollama embeddings
+- Gemini Embedding 2 cloud embeddings
 - PostgreSQL + pgvector chunk storage
 - asynchronous post-commit indexing
 - ingestion lifecycle tracking
@@ -39,8 +39,12 @@ The default embedding model is `nomic-embed-text`, expected to produce 768-dimen
 
 ## Configuration
 
-- `OLLAMA_BASE_URL` — default `http://localhost:11434`
-- `OLLAMA_EMBEDDING_MODEL` — default `nomic-embed-text`
+- `GEMINI_API_KEY` — Gemini Developer API key
+- `GEMINI_EMBEDDING_MODEL` — default `gemini-embedding-2`
+- `GEMINI_EMBEDDING_DIMENSIONS` — default `768` (matches pgvector `vector(768)`)
+- `GEMINI_GENERATION_MODEL` — default `gemini-3.8-flash`
+- `HF_TOKEN` — Hugging Face token for generation fallback
+- `HF_GENERATION_MODEL` — default `Qwen/Qwen3-30B-A3B-Instruct-2507`
 - `INGESTION_CHUNK_SIZE` — default `1200`
 - `INGESTION_CHUNK_OVERLAP` — default `200`
 
@@ -72,3 +76,20 @@ Phase 3 does not generate answers or expose semantic search. Retrieval and groun
 - replacement re-indexes the new version
 - document deletion cascades chunk cleanup
 - no LLM answer generation is introduced
+
+
+## AI provider architecture
+
+Phase 3 no longer depends on a local Ollama process.
+
+- **Embeddings:** Gemini Embedding 2, 768 dimensions.
+- **Generation primary:** Gemini 3.8 Flash.
+- **Generation fallback:** Hugging Face Inference Providers through the OpenAI-compatible chat-completions endpoint.
+- **Provider abstraction:** ingestion depends on `EmbeddingService`, not a vendor-specific embedding SDK.
+- **Embedding safety:** document and query embeddings must remain in the same embedding space. Do not mix Gemini and Ollama/Hugging Face vectors in the same pgvector index.
+
+### Embedding migration
+
+Existing chunks created with `nomic-embed-text` are not compatible with Gemini embeddings. They must be re-indexed before semantic retrieval is enabled. The existing ingestion/retry flow can regenerate chunks with the configured Gemini provider.
+
+For production, a provider/model change should be treated as an embedding-index migration and tracked explicitly rather than silently mixing vector spaces.
