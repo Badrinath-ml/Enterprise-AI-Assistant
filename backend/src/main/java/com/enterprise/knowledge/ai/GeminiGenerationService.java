@@ -93,26 +93,14 @@ public class GeminiGenerationService implements GenerationService, StreamingGene
 
             StringBuilder full = new StringBuilder();
 
+            StringBuilder full = new StringBuilder();
+
             try (java.util.stream.Stream<String> lines = response.body()) {
-                BufferedReader reader = new BufferedReader(
-                        new java.io.Reader() {
-                            private final java.util.Iterator<String> iterator = lines.iterator();
+                java.util.Iterator<String> iterator = lines.iterator();
 
-                            @Override
-                            public int read(char[] cbuf, int off, int len) {
-                                if (!iterator.hasNext()) return -1;
-                                String line = iterator.next() + System.lineSeparator();
-                                int count = Math.min(len, line.length());
-                                line.getChars(0, count, cbuf, off);
-                                return count;
-                            }
+                while (iterator.hasNext()) {
+                    String line = iterator.next();
 
-                            @Override
-                            public void close() {}
-                        });
-
-                String line;
-                while ((line = reader.readLine()) != null) {
                     if (!line.startsWith("data:")) {
                         continue;
                     }
