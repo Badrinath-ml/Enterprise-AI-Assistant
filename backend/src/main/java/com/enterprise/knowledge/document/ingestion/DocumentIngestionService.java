@@ -67,7 +67,7 @@ public class DocumentIngestionService {
             }
             if (sources.isEmpty()) throw new IllegalArgumentException("Document contains no extractable text");
 
-            replaceChunks(tenantId, documentId, version, sources);
+            replaceChunks(tenantId, documentId, version, d.getTitle(), sources);
             markIndexed(tenantId, documentId, version, sources.size());
         } catch (Exception e) {
             markFailed(tenantId, documentId, e.getMessage());
@@ -81,8 +81,13 @@ public class DocumentIngestionService {
         documentRepository.save(d);
     }
 
-    protected void replaceChunks(UUID tenantId, UUID documentId, int version, List<ChunkSource> sources) {
-        List<float[]> embeddings = embeddingService.embedDocuments(sources.stream().map(ChunkSource::content).toList());
+    protected void replaceChunks(UUID tenantId, UUID documentId, int version, String title, List<ChunkSource> sources) {
+        String documentTitle = title == null || title.isBlank() ? "none" : title.trim();
+        List<float[]> embeddings = embeddingService.embedDocuments(
+                sources.stream()
+                        .map(source -> "title: " + documentTitle + " | text: " + source.content())
+                        .toList()
+        );
         if (embeddings.size() != sources.size()) {
             throw new IllegalStateException("Embedding provider returned an unexpected number of vectors");
         }
