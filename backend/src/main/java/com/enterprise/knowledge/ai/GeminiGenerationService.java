@@ -1,6 +1,6 @@
 package com.enterprise.knowledge.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -44,7 +44,7 @@ public class GeminiGenerationService implements GenerationService {
 
         String text = root == null
                 ? null
-                : root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText(null);
+                : root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asString(null);
 
         if (text == null || text.isBlank()) {
             throw new IllegalStateException("Gemini returned no generated text");
