@@ -58,6 +58,8 @@ app:
     embedding:
       model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-2}
       dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:768}
+    retrieval:
+      minimum-similarity: 0.20
     generation:
       gemini-model: ${GEMINI_GENERATION_MODEL:gemini-3.8-flash}
       huggingface-model: ${HF_GENERATION_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}
