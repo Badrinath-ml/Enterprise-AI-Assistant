@@ -8,6 +8,7 @@ import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { UsersPage } from '../pages/users/UsersPage';
 import { DepartmentsPage } from '../pages/departments/DepartmentsPage';
 import { DocumentsPage } from '../pages/documents/DocumentsPage';
+import { ChatPage } from '../pages/chat/ChatPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
 import { NotFoundPage } from '../pages/error/NotFoundPage';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -27,6 +28,7 @@ export const AppRoutes: React.FC = () => (
       <Route path="/team" element={<RoleRoute allowedRoles={['MANAGER']}><UsersPage /></RoleRoute>} />
       <Route path="/departments" element={<RoleRoute allowedRoles={['ADMIN']}><DepartmentsPage /></RoleRoute>} />
       <Route path="/documents" element={<DocumentsPage />} />
+      <Route path="/chat" element={<ChatPage />} />
       <Route path="/profile" element={<ProfilePage />} />
     </Route>
     <Route path="*" element={<NotFoundPage />} />
