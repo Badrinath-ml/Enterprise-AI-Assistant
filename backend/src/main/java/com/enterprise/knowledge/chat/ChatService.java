@@ -1,5 +1,7 @@
 package com.enterprise.knowledge.chat;
 
+import com.enterprise.knowledge.ai.StreamingGenerationService;
+
 import com.enterprise.knowledge.ai.GenerationRequest;
 import com.enterprise.knowledge.ai.GenerationResponse;
 import com.enterprise.knowledge.ai.GenerationService;
