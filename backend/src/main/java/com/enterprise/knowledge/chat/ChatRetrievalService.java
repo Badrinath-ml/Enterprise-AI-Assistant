@@ -3,6 +3,7 @@ package com.enterprise.knowledge.chat;
 import com.enterprise.knowledge.document.ingestion.EmbeddingService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 import java.util.UUID;
@@ -11,10 +12,15 @@ import java.util.UUID;
 public class ChatRetrievalService {
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingService embeddingService;
+    private final double minimumSimilarity;
 
-    public ChatRetrievalService(JdbcTemplate jdbcTemplate, EmbeddingService embeddingService) {
+    public ChatRetrievalService(
+            JdbcTemplate jdbcTemplate,
+            EmbeddingService embeddingService,
+            @Value("${app.ai.retrieval.minimum-similarity:0.20}") double minimumSimilarity) {
         this.jdbcTemplate = jdbcTemplate;
         this.embeddingService = embeddingService;
+        this.minimumSimilarity = minimumSimilarity;
     }
 
     public List<RetrievedChunk> retrieve(UUID tenantId, UUID departmentId, boolean admin,
@@ -61,7 +67,7 @@ public class ChatRetrievalService {
                 rs.getString("original_file_name"),
                 rs.getString("mime_type"),
                 rs.getDouble("similarity")
-        )).stream().filter(c -> c.similarity() >= 0.35).toList();
+        )).stream().filter(c -> c.similarity() >= minimumSimilarity).toList();
     }
 
     private String toVectorLiteral(float[] vector) {
