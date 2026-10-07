@@ -4,12 +4,15 @@ import com.enterprise.knowledge.document.ingestion.EmbeddingService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class ChatRetrievalService {
+    private static final Logger log = LoggerFactory.getLogger(ChatRetrievalService.class);
     private final JdbcTemplate jdbcTemplate;
     private final EmbeddingService embeddingService;
     private final double minimumSimilarity;
@@ -55,7 +58,7 @@ public class ChatRetrievalService {
             params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
                     embeddingService.model(), embeddingService.dimensions(), departmentId, literal, topK};
         }
-        return jdbcTemplate.query(sql, params, (rs, rowNum) -> new RetrievedChunk(
+        List<RetrievedChunk> candidates = jdbcTemplate.query(sql, params, (rs, rowNum) -> new RetrievedChunk(
                 rs.getObject("chunk_id", UUID.class),
                 rs.getObject("document_id", UUID.class),
                 rs.getInt("document_version"),
@@ -67,7 +70,14 @@ public class ChatRetrievalService {
                 rs.getString("original_file_name"),
                 rs.getString("mime_type"),
                 rs.getDouble("similarity")
-        )).stream().filter(c -> c.similarity() >= minimumSimilarity).toList();
+        ));
+
+        log.info("RAG retrieval: admin={}, department={}, candidates={}, threshold={}, topSimilarity={}, query={}",
+                admin, departmentId, candidates.size(), minimumSimilarity,
+                candidates.isEmpty() ? null : candidates.get(0).similarity(),
+                query);
+
+        return candidates.stream().filter(c -> c.similarity() >= minimumSimilarity).toList();
     }
 
     private String toVectorLiteral(float[] vector) {
