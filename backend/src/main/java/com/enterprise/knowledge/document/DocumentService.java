@@ -6,7 +6,6 @@ import com.enterprise.knowledge.document.dto.DocumentPageResponse;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
 import com.enterprise.knowledge.document.dto.UpdateDocumentRequest;
 import com.enterprise.knowledge.document.storage.FileStorageService;
-import com.enterprise.knowledge.document.ingestion.DocumentIngestionService;
 import com.enterprise.knowledge.document.ingestion.DocumentIngestionRequestedEvent;
 import com.enterprise.knowledge.tenant.Tenant;
 import com.enterprise.knowledge.tenant.TenantRepository;
@@ -33,7 +32,6 @@ public class DocumentService {
     private final TenantRepository tenantRepository;
     private final UserService userService;
     private final FileStorageService storage;
-    private final DocumentIngestionService ingestionService;
     private final ApplicationEventPublisher eventPublisher;
 
     public DocumentService(DocumentRepository documentRepository,
@@ -41,14 +39,12 @@ public class DocumentService {
                            TenantRepository tenantRepository,
                            UserService userService,
                            FileStorageService storage,
-                           DocumentIngestionService ingestionService,
                            ApplicationEventPublisher eventPublisher) {
         this.documentRepository = documentRepository;
         this.departmentRepository = departmentRepository;
         this.tenantRepository = tenantRepository;
         this.userService = userService;
         this.storage = storage;
-        this.ingestionService = ingestionService;
         this.eventPublisher = eventPublisher;
     }
 
