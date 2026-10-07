@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { storage } from '../utils/storage';
 import { ChatConversation, ChatHistory, ChatSendResponse, ChatSource, IngestionResponse } from '../types/chat';
 
 export const chatApi = {
@@ -29,7 +30,7 @@ export const chatApi = {
     message: string,
     onToken: (token: string) => void,
   ): Promise<void> {
-    const token = localStorage.getItem('token');
+    const token = storage.getToken();
     const base = import.meta.env.VITE_API_URL || '';
     const response = await fetch(`${base}/api/v1/chat/conversations/${id}/stream?message=${encodeURIComponent(message)}`, {
       method: 'POST',
