@@ -10,16 +10,14 @@ import org.springframework.web.client.RestClient;
 public class GeminiGenerationService implements GenerationService {
     private final RestClient client;
     private final String model;
+    private final String apiKey;
 
     public GeminiGenerationService(
             RestClient.Builder restClientBuilder,
             @Value("${app.ai.gemini.api-key:}") String apiKey,
             @Value("${app.ai.generation.gemini-model:gemini-3.8-flash}") String model) {
 
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("GEMINI_API_KEY is required for Gemini generation");
-        }
-
+        this.apiKey = apiKey;
         this.model = model;
         this.client = restClientBuilder
                 .baseUrl("https://generativelanguage.googleapis.com")
@@ -30,6 +28,7 @@ public class GeminiGenerationService implements GenerationService {
 
     @Override
     public GenerationResponse generate(GenerationRequest request) {
+        requireApiKey();
         JsonNode root = client.post()
                 .uri("/v1beta/models/{model}:generateContent", model)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -51,6 +50,12 @@ public class GeminiGenerationService implements GenerationService {
         }
 
         return new GenerationResponse(text, "gemini", model);
+    }
+
+    private void requireApiKey() {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("GEMINI_API_KEY is required for Gemini generation");
+        }
     }
 
     private record GenerateRequest(java.util.List<Content> contents, Content systemInstruction) {}
