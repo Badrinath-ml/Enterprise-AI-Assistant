@@ -2,6 +2,8 @@ package com.enterprise.knowledge.document;
 
 import com.enterprise.knowledge.common.tenant.TenantContext;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
+import com.enterprise.knowledge.document.dto.DocumentIngestionResponse;
+import com.enterprise.knowledge.document.ingestion.DocumentIngestionService;
 import com.enterprise.knowledge.document.dto.DocumentPageResponse;
 import com.enterprise.knowledge.document.dto.UpdateDocumentRequest;
 import jakarta.validation.Valid;
@@ -19,9 +21,11 @@ import java.util.UUID;
 @RequestMapping("/api/v1/documents")
 public class DocumentController {
     private final DocumentService documentService;
+    private final DocumentIngestionService ingestionService;
 
-    public DocumentController(DocumentService documentService) {
+    public DocumentController(DocumentService documentService, DocumentIngestionService ingestionService) {
         this.documentService = documentService;
+        this.ingestionService = ingestionService;
     }
 
     @GetMapping
@@ -37,6 +41,29 @@ public class DocumentController {
                 TenantContext.getRequired(), UUID.fromString(jwt.getSubject()),
                 q, departmentId, status, page, size
         );
+    }
+
+    @GetMapping("/{id}/ingestion")
+    @PreAuthorize("isAuthenticated()")
+    public DocumentIngestionResponse ingestionStatus(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ingestionService.status(
+                TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id
+        );
+    }
+
+    @PostMapping("/{id}/ingestion")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public DocumentIngestionResponse retryIngestion(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID tenantId = TenantContext.getRequired();
+        UUID actorId = UUID.fromString(jwt.getSubject());
+        documentService.get(tenantId, actorId, id);
+        ingestionService.markQueued(tenantId, id);
+        ingestionService.queue(tenantId, id);
+        return ingestionService.status(tenantId, id);
     }
 
     @GetMapping("/{id}")
