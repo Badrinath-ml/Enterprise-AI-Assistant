@@ -25,7 +25,6 @@
         <pdfbox.version>2.0.31</pdfbox.version>
         <poi.version>5.4.1</poi.version>
         <jjwt.version>0.13.0</jjwt.version>
-        <google-genai.version>1.75.0</google-genai.version>
     </properties>
 
     <dependencyManagement>
@@ -82,12 +81,7 @@
             <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
 
-        <!-- AI / Embeddings -->
-        <dependency>
-            <groupId>com.google.genai</groupId>
-            <artifactId>google-genai</artifactId>
-            <version>1.75.0</version>
-        </dependency>
+        <!-- AI providers are accessed through Spring's HTTP client abstraction. -->
 
         <!-- Document text extraction -->
         <dependency>
