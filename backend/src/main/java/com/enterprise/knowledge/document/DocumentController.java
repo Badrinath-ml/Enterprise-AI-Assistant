@@ -48,9 +48,7 @@ public class DocumentController {
     public DocumentIngestionResponse ingestionStatus(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
-        return ingestionService.status(
-                TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id
-        );
+        return ingestionService.status(id, TenantContext.getRequired());
     }
 
     @PostMapping("/{id}/ingestion")
