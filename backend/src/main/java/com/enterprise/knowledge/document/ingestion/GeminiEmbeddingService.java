@@ -1,7 +1,6 @@
 package com.enterprise.knowledge.document.ingestion;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -24,12 +23,10 @@ public class GeminiEmbeddingService implements EmbeddingService {
     private static final int BATCH_SIZE = 32;
 
     private final RestClient client;
-    private final ObjectMapper objectMapper;
-    private final String model;
+        private final String model;
 
     public GeminiEmbeddingService(
             RestClient.Builder restClientBuilder,
-            ObjectMapper objectMapper,
             @Value("${app.ai.gemini.api-key:}") String apiKey,
             @Value("${app.ai.embedding.model:gemini-embedding-2}") String model) {
 
@@ -37,7 +34,6 @@ public class GeminiEmbeddingService implements EmbeddingService {
             throw new IllegalStateException("GEMINI_API_KEY is required for Gemini embeddings");
         }
 
-        this.objectMapper = objectMapper;
         this.model = model;
         this.client = restClientBuilder
                 .baseUrl("https://generativelanguage.googleapis.com")
