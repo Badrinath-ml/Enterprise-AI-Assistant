@@ -75,10 +75,10 @@ public class Document {
 
     protected Document() {}
 
-    public Document(Tenant tenant, Department department, AppUser uploadedBy,
+    public Document(UUID id, Tenant tenant, Department department, AppUser uploadedBy,
                     String title, String description, String originalFileName,
                     String storageKey, String mimeType, long fileSize) {
-        this.id = UUID.randomUUID();
+        this.id = id;
         this.tenant = tenant;
         this.department = department;
         this.uploadedBy = uploadedBy;
