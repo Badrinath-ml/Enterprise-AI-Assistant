@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 
-@Service
 public class FallbackGenerationService implements GenerationService {
     private final GenerationService primary;
     private final GenerationService fallback;
