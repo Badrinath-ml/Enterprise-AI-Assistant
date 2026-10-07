@@ -156,7 +156,7 @@ public class ChatService {
     @Transactional
     public DocumentResponse upload(UUID tenantId, UUID userId, UUID conversationId, MultipartFile file) {
         getConversation(tenantId, userId, conversationId);
-        return documentService.create(tenantId, userId, file, file.getOriginalFilename(), null, null);
+        return documentService.createChatAttachment(tenantId, userId, file);
     }
 
     @Transactional(readOnly = true)
