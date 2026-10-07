@@ -1,6 +1,6 @@
 package com.enterprise.knowledge.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -47,7 +47,7 @@ public class HuggingFaceGenerationService implements GenerationService {
 
         String text = root == null
                 ? null
-                : root.path("choices").path(0).path("message").path("content").asText(null);
+                : root.path("choices").path(0).path("message").path("content").asString(null);
 
         if (text == null || text.isBlank()) {
             throw new IllegalStateException("Hugging Face returned no generated text");
