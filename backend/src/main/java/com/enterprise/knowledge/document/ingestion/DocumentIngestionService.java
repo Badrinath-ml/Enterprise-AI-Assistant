@@ -137,7 +137,7 @@ public class DocumentIngestionService {
     }
 
     private int estimateTokenCount(String text) {
-        return Math.max(1, text.trim().split("\s+").length);
+        return Math.max(1, text.trim().split("\\s+").length);
     }
 
     private record ChunkSource(String content, int pageNumber) {}
