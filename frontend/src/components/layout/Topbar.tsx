@@ -18,6 +18,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
     if (path.startsWith('/team')) return 'My Team';
     if (path.startsWith('/departments')) return 'Departments';
     if (path.startsWith('/documents')) return 'Documents';
+    if (path.startsWith('/chat')) return 'Assistant';
     if (path.startsWith('/profile')) return 'Profile';
     return 'Enterprise Assistant';
   };
