@@ -3,14 +3,11 @@ package com.enterprise.knowledge.chat;
 import com.enterprise.knowledge.ai.GenerationRequest;
 import com.enterprise.knowledge.ai.GenerationResponse;
 import com.enterprise.knowledge.ai.GenerationService;
+import com.enterprise.knowledge.chat.dto.*;
 import com.enterprise.knowledge.document.Document;
 import com.enterprise.knowledge.document.DocumentService;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
-import com.enterprise.knowledge.document.ingestion.DocumentIngestionService;
-import com.enterprise.knowledge.document.IngestionStatus;
 import com.enterprise.knowledge.document.ingestion.DocumentTextExtractorService;
-import com.enterprise.knowledge.document.storage.FileStorageService;
-import com.enterprise.knowledge.chat.dto.*;
 import com.enterprise.knowledge.tenant.Tenant;
 import com.enterprise.knowledge.tenant.TenantRepository;
 import com.enterprise.knowledge.user.AppUser;
@@ -21,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,7 +33,7 @@ public class ChatService {
     private final UserService userService;
     private final TenantRepository tenantRepository;
     private final DocumentService documentService;
-    private final DocumentIngestionService ingestion;
+    private final DocumentTextExtractorService extractor;
 
     public ChatService(ChatConversationRepository conversations,
                        ChatMessageRepository messages,
@@ -47,7 +43,7 @@ public class ChatService {
                        UserService userService,
                        TenantRepository tenantRepository,
                        DocumentService documentService,
-                       DocumentIngestionService ingestion) {
+                       DocumentTextExtractorService extractor) {
         this.conversations = conversations;
         this.messages = messages;
         this.citations = citations;
@@ -56,7 +52,7 @@ public class ChatService {
         this.userService = userService;
         this.tenantRepository = tenantRepository;
         this.documentService = documentService;
-        this.ingestion = ingestion;
+        this.extractor = extractor;
     }
 
     @Transactional
@@ -78,14 +74,15 @@ public class ChatService {
     @Transactional(readOnly = true)
     public ChatHistoryResponse history(UUID tenantId, UUID userId, UUID conversationId) {
         ChatConversation c = getConversation(tenantId, userId, conversationId);
-        List<ChatMessageResponse> result = messages.findByConversationIdOrderByCreatedAtAsc(c.getId())
-                .stream().map(this::toMessage).toList();
-        return new ChatHistoryResponse(result);
+        return new ChatHistoryResponse(
+                messages.findByConversationIdOrderByCreatedAtAsc(c.getId()).stream()
+                        .map(this::toMessage).toList());
     }
 
     @Transactional
     public ChatSendResponse send(UUID tenantId, UUID userId, UUID conversationId, String prompt) {
         if (prompt == null || prompt.isBlank()) throw new IllegalArgumentException("Message cannot be blank");
+
         ChatConversation conversation = getConversation(tenantId, userId, conversationId);
         AppUser user = userService.findByIdAndTenant(userId, tenantId);
 
@@ -103,7 +100,7 @@ public class ChatService {
         );
 
         String context = chunks.stream()
-                .map(c -> "[SOURCE " + c.chunkIndex() + "] " + c.title() + " (" + c.fileName() + ")"
+                .map(c -> "[SOURCE] " + c.title() + " (" + c.fileName() + ")"
                         + (c.pageNumber() == null ? "" : ", page " + c.pageNumber())
                         + "\n" + c.content())
                 .collect(java.util.stream.Collectors.joining("\n\n"));
@@ -117,7 +114,7 @@ public class ChatService {
                 You are the Enterprise Knowledge Assistant.
                 Answer using the supplied enterprise sources. Do not invent facts.
                 If the sources do not contain enough evidence, say that clearly.
-                Prefer concise, useful answers. Do not mention internal source IDs.
+                Prefer concise, useful answers.
                 """;
 
         String promptWithContext = """
@@ -148,7 +145,8 @@ public class ChatService {
 
         conversation.touchNow();
         if ("New conversation".equals(conversation.getTitle())) {
-            conversation.setTitle(prompt.trim().length() > 60 ? prompt.trim().substring(0, 60) : prompt.trim());
+            String title = prompt.trim();
+            conversation.setTitle(title.length() > 60 ? title.substring(0, 60) : title);
         }
         conversations.save(conversation);
 
@@ -158,23 +156,18 @@ public class ChatService {
     @Transactional
     public DocumentResponse upload(UUID tenantId, UUID userId, UUID conversationId, MultipartFile file) {
         getConversation(tenantId, userId, conversationId);
-        DocumentResponse response = documentService.create(tenantId, userId, file, file.getOriginalFilename(), null,
-                null);
-        ingestion.queue(tenantId, response.id());
-        return response;
+        return documentService.create(tenantId, userId, file, file.getOriginalFilename(), null, null);
     }
 
     @Transactional(readOnly = true)
-    public ChatSourceResponse source(UUID tenantId, UUID userId, UUID documentId, UUID chunkId) {
+    public ChatSourceResponse source(UUID tenantId, UUID userId, UUID documentId) {
         Document document = documentService.getEntity(tenantId, userId, documentId);
         try {
             Resource resource = documentService.content(tenantId, userId, documentId);
             byte[] bytes = resource.getInputStream().readAllBytes();
-            String text = new DocumentTextExtractorService(List.of()).extract(bytes,
-                    document.getOriginalFileName(), document.getMimeType()).text();
+            String text = extractor.extract(bytes, document.getOriginalFileName(), document.getMimeType()).text();
             return new ChatSourceResponse(document.getId(), document.getTitle(),
-                    document.getOriginalFileName(), document.getMimeType(), document.getVersion(),
-                    null, text);
+                    document.getOriginalFileName(), document.getMimeType(), document.getVersion(), text);
         } catch (Exception e) {
             throw new IllegalArgumentException("Unable to read document source");
         }
@@ -202,7 +195,4 @@ public class ChatService {
         return new ChatMessageResponse(m.getId(), m.getRole().name(), m.getContent(), m.getCreatedAt(),
                 m.getProvider(), m.getModel(), refs);
     }
-
-    private record ChatSourceResponse(UUID documentId, String title, String fileName,
-                                      String mimeType, int version, Integer pageNumber, String text) {}
 }
