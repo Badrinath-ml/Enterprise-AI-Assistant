@@ -10,6 +10,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -22,12 +24,15 @@ public class DocumentIngestionService {
     private final DocumentTextExtractorService extractor;
     private final TextChunker chunker;
     private final EmbeddingModel embeddingModel;
+    private final TransactionTemplate transactionTemplate;
 
     public DocumentIngestionService(DocumentRepository documentRepository, DocumentChunkRepository chunkRepository,
                                     FileStorageService storage, DocumentTextExtractorService extractor,
-                                    TextChunker chunker, EmbeddingModel embeddingModel) {
+                                    TextChunker chunker, EmbeddingModel embeddingModel,
+                                    PlatformTransactionManager transactionManager) {
         this.documentRepository=documentRepository; this.chunkRepository=chunkRepository; this.storage=storage;
         this.extractor=extractor; this.chunker=chunker; this.embeddingModel=embeddingModel;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Async("documentIngestionExecutor")
@@ -51,30 +56,30 @@ public class DocumentIngestionService {
         } catch (Exception e) { markFailed(tenantId, documentId, e.getMessage()); }
     }
 
-    @Transactional
-    protected void markProcessing(UUID tenantId, UUID documentId) { Document d=find(tenantId,documentId); d.setIngestionStatus(IngestionStatus.PROCESSING); d.setIngestionError(null); }
+    protected void markProcessing(UUID tenantId, UUID documentId) { Document d=find(tenantId,documentId); d.setIngestionStatus(IngestionStatus.PROCESSING); d.setIngestionError(null); documentRepository.save(d); }
 
-    @Transactional
     protected void replaceChunks(UUID tenantId, UUID documentId, int version, List<String> chunks) {
-        chunkRepository.deleteForDocument(documentId);
-        for (int i=0;i<chunks.size();i++) {
-            float[] embedding=embeddingModel.embed(chunks.get(i));
-            if (embedding.length != 768) throw new IllegalStateException("Embedding dimension " + embedding.length + " does not match pgvector dimension 768");
-            chunkRepository.insert(tenantId,documentId,version,i,chunks.get(i),estimateTokenCount(chunks.get(i)),embedding);
-        }
+        transactionTemplate.executeWithoutResult(status -> {
+            chunkRepository.deleteForDocument(documentId);
+            for (int i=0;i<chunks.size();i++) {
+                float[] embedding=embeddingModel.embed(chunks.get(i));
+                if (embedding.length != 768) throw new IllegalStateException("Embedding dimension " + embedding.length + " does not match pgvector dimension 768");
+                chunkRepository.insert(tenantId,documentId,version,i,chunks.get(i),estimateTokenCount(chunks.get(i)),embedding);
+            }
+        });
     }
 
-    @Transactional
     protected void markIndexed(UUID tenantId, UUID documentId, int version, int chunkCount) {
         Document d=find(tenantId,documentId);
         if (d.getVersion()!=version) throw new IllegalStateException("Document changed while it was being indexed; retry ingestion");
         d.setIngestionStatus(IngestionStatus.INDEXED); d.setIngestionError(null); d.setIndexedAt(Instant.now()); d.setIndexedChunkCount(chunkCount);
+        documentRepository.save(d);
     }
 
-    @Transactional
     protected void markFailed(UUID tenantId, UUID documentId, String message) {
         Document d=find(tenantId,documentId); d.setIngestionStatus(IngestionStatus.FAILED);
         String error=message==null?"Ingestion failed":message; d.setIngestionError(error.substring(0,Math.min(error.length(),1900)));
+        documentRepository.save(d);
     }
 
     @Transactional(readOnly=true)
