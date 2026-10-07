@@ -10,17 +10,15 @@ import org.springframework.web.client.RestClient;
 public class HuggingFaceGenerationService implements GenerationService {
     private final RestClient client;
     private final String model;
+    private final String token;
 
     public HuggingFaceGenerationService(
             RestClient.Builder restClientBuilder,
             @Value("${app.ai.huggingface.token:}") String token,
             @Value("${app.ai.generation.huggingface-model:Qwen/Qwen3-30B-A3B-Instruct-2507}") String model) {
 
-        if (token == null || token.isBlank()) {
-            throw new IllegalStateException("HF_TOKEN is required for Hugging Face generation");
-        }
-
         this.model = model;
+        this.token = token;
         this.client = restClientBuilder
                 .baseUrl("https://router.huggingface.co")
                 .defaultHeader("Authorization", "Bearer " + token)
@@ -30,9 +28,13 @@ public class HuggingFaceGenerationService implements GenerationService {
 
     @Override
     public GenerationResponse generate(GenerationRequest request) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("HF_TOKEN is required for Hugging Face generation");
+        }
         String system = request.systemInstruction();
         JsonNode root = client.post()
                 .uri("/v1/chat/completions")
+                .header("Authorization", "Bearer " + token)
                 .body(new ChatRequest(
                         model,
                         java.util.List.of(
