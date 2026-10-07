@@ -23,7 +23,8 @@ public class ChatRetrievalService {
         String literal = toVectorLiteral(vector);
         String sql = """
                 SELECT c.id AS chunk_id, c.document_id, c.document_version, c.chunk_index,
-                       c.content, d.title, d.original_file_name, d.mime_type,
+                       c.content, c.page_number, c.source_locator,
+                       d.title, d.original_file_name, d.mime_type,
                        1 - (c.embedding <=> ?::vector) AS similarity
                 FROM document_chunks c
                 JOIN documents d ON d.id = c.document_id
@@ -42,6 +43,7 @@ public class ChatRetrievalService {
             params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
                     embeddingService.model(), embeddingService.dimensions(), literal, topK};
         } else {
+            if (departmentId == null) return List.of();
             sql += " AND (d.department_id IS NULL OR d.department_id = ?)";
             sql += " ORDER BY c.embedding <=> ?::vector LIMIT ?";
             params = new Object[]{literal, tenantId, tenantId, embeddingService.provider(),
@@ -53,6 +55,8 @@ public class ChatRetrievalService {
                 rs.getInt("document_version"),
                 rs.getInt("chunk_index"),
                 rs.getString("content"),
+                rs.getInt("page_number"),
+                rs.getString("source_locator"),
                 rs.getString("title"),
                 rs.getString("original_file_name"),
                 rs.getString("mime_type"),
@@ -70,14 +74,8 @@ public class ChatRetrievalService {
     }
 
     public record RetrievedChunk(
-            UUID chunkId,
-            UUID documentId,
-            int documentVersion,
-            int chunkIndex,
-            String content,
-            String title,
-            String fileName,
-            String mimeType,
-            double similarity
+            UUID chunkId, UUID documentId, int documentVersion, int chunkIndex,
+            String content, Integer pageNumber, String locatorLabel,
+            String title, String fileName, String mimeType, double similarity
     ) {}
 }
