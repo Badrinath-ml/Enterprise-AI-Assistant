@@ -25,6 +25,7 @@
         <pdfbox.version>2.0.31</pdfbox.version>
         <poi.version>5.4.1</poi.version>
         <jjwt.version>0.13.0</jjwt.version>
+        <google-genai.version>1.75.0</google-genai.version>
     </properties>
 
     <dependencyManagement>
@@ -83,8 +84,9 @@
 
         <!-- AI / Embeddings -->
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-model-ollama</artifactId>
+            <groupId>com.google.genai</groupId>
+            <artifactId>google-genai</artifactId>
+            <version>1.75.0</version>
         </dependency>
 
         <!-- Document text extraction -->
