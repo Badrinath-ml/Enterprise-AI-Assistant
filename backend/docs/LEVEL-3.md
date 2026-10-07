@@ -93,3 +93,8 @@ Phase 3 no longer depends on a local Ollama process.
 Existing chunks created with `nomic-embed-text` are not compatible with Gemini embeddings. They must be re-indexed before semantic retrieval is enabled. The existing ingestion/retry flow can regenerate chunks with the configured Gemini provider.
 
 For production, a provider/model change should be treated as an embedding-index migration and tracked explicitly rather than silently mixing vector spaces.
+
+
+### Embedding index metadata
+
+Each chunk now records the embedding provider, model, and dimensions. This prevents a future provider/model migration from becoming an invisible vector-space mix. Existing Phase 3 rows are labeled as the previous Ollama `nomic-embed-text` index by migration V4; they must be re-indexed with Gemini before retrieval is used.
