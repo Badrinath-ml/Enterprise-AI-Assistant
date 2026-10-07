@@ -17,6 +17,11 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,6 +39,8 @@ public class ChatService {
     private final TenantRepository tenantRepository;
     private final DocumentService documentService;
     private final DocumentTextExtractorService extractor;
+    private final ChatPersistenceService persistence;
+    private final StreamingGenerationService streamingGeneration;
 
     public ChatService(ChatConversationRepository conversations,
                        ChatMessageRepository messages,
@@ -43,7 +50,9 @@ public class ChatService {
                        UserService userService,
                        TenantRepository tenantRepository,
                        DocumentService documentService,
-                       DocumentTextExtractorService extractor) {
+                       DocumentTextExtractorService extractor,
+                       ChatPersistenceService persistence,
+                       StreamingGenerationService streamingGeneration) {
         this.conversations = conversations;
         this.messages = messages;
         this.citations = citations;
@@ -53,6 +62,8 @@ public class ChatService {
         this.tenantRepository = tenantRepository;
         this.documentService = documentService;
         this.extractor = extractor;
+        this.persistence = persistence;
+        this.streamingGeneration = streamingGeneration;
     }
 
     @Transactional
@@ -152,6 +163,93 @@ public class ChatService {
 
         return new ChatSendResponse(conversationId, toMessage(userMessage), toMessage(assistant));
     }
+
+
+    public SseEmitter stream(UUID tenantId, UUID userId, UUID conversationId, String prompt) {
+        if (prompt == null || prompt.isBlank()) throw new IllegalArgumentException("Message cannot be blank");
+
+        SseEmitter emitter = new SseEmitter(180_000L);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        executor.submit(() -> {
+            try {
+                persistence.saveUserMessage(tenantId, userId, conversationId, prompt.trim());
+
+                AppUser user = userService.findByIdAndTenant(userId, tenantId);
+                List<ChatMessage> previous = persistence.history(tenantId, userId, conversationId);
+                List<ChatRetrievalService.RetrievedChunk> chunks = retrieval.retrieve(
+                        tenantId,
+                        user.getDepartment() == null ? null : user.getDepartment().getId(),
+                        user.getRole() == UserRole.ADMIN,
+                        prompt.trim(),
+                        TOP_K
+                );
+
+                String context = chunks.stream()
+                        .map(c -> "[SOURCE] " + c.title() + " (" + c.fileName() + ")"
+                                + (c.pageNumber() == null ? "" : ", page " + c.pageNumber())
+                                + "\n" + c.content())
+                        .collect(java.util.stream.Collectors.joining("\n\n"));
+
+                String history = previous.stream()
+                        .limit(Math.max(0, previous.size() - 1))
+                        .skip(Math.max(0, previous.size() - 13))
+                        .map(m -> (m.getRole() == ChatMessageRole.USER ? "User: " : "Assistant: ") + m.getContent())
+                        .collect(java.util.stream.Collectors.joining("\n"));
+
+                String system = """
+                        You are the Enterprise Knowledge Assistant.
+                        Answer using the supplied enterprise sources. Do not invent facts.
+                        If the sources do not contain enough evidence, say that clearly.
+                        Prefer concise, useful answers.
+                        """;
+
+                String promptWithContext = """
+                        Conversation history:
+                        %s
+
+                        Retrieved sources:
+                        %s
+
+                        User question:
+                        %s
+                        """.formatted(
+                        history.isBlank() ? "(none)" : history,
+                        context.isBlank() ? "(no matching approved indexed source)" : context,
+                        prompt.trim());
+
+                GenerationResponse generated = streamingGeneration.stream(
+                        new GenerationRequest(system, promptWithContext),
+                        token -> {
+                            try {
+                                emitter.send(SseEmitter.event().name("token").data(token));
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+
+                persistence.saveAssistant(
+                        tenantId, userId, conversationId,
+                        generated.text(), generated.provider(), generated.model(), chunks);
+                persistence.touchWithTitle(tenantId, userId, conversationId, prompt.trim());
+
+                emitter.send(SseEmitter.event().name("done").data(
+                        new StreamDoneResponse(conversationId, generated.provider(), generated.model())));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    emitter.send(SseEmitter.event().name("error").data(
+                            e.getMessage() == null ? "Unable to generate an answer." : e.getMessage()));
+                } catch (Exception ignored) {}
+                emitter.completeWithError(e);
+            } finally {
+                executor.shutdown();
+            }
+        });
+        return emitter;
+    }
+
+    public record StreamDoneResponse(UUID conversationId, String provider, String model) {}
 
     @Transactional
     public DocumentResponse upload(UUID tenantId, UUID userId, UUID conversationId, MultipartFile file) {
