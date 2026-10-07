@@ -30,16 +30,15 @@ public class GeminiGenerationService implements GenerationService {
 
     @Override
     public GenerationResponse generate(GenerationRequest request) {
-        var parts = new java.util.ArrayList<Part>();
-        if (!request.systemInstruction().isBlank()) {
-            parts.add(new Part(request.systemInstruction()));
-        }
-        parts.add(new Part(request.userPrompt()));
-
         JsonNode root = client.post()
                 .uri("/v1beta/models/{model}:generateContent", model)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new GenerateRequest(java.util.List.of(new Content(parts))))
+                .body(new GenerateRequest(
+                        java.util.List.of(new Content(java.util.List.of(new Part(request.userPrompt())))),
+                        request.systemInstruction().isBlank()
+                                ? null
+                                : new Content(java.util.List.of(new Part(request.systemInstruction())))
+                ))
                 .retrieve()
                 .body(JsonNode.class);
 
@@ -54,7 +53,7 @@ public class GeminiGenerationService implements GenerationService {
         return new GenerationResponse(text, "gemini", model);
     }
 
-    private record GenerateRequest(java.util.List<Content> contents) {}
+    private record GenerateRequest(java.util.List<Content> contents, Content systemInstruction) {}
     private record Content(java.util.List<Part> parts) {}
     private record Part(String text) {}
 }
