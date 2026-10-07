@@ -5,6 +5,8 @@ import { ChatCitation, ChatConversation, ChatMessage, ChatSource } from '../../t
 import { useToast } from '../../hooks/useToast';
 import { SourceViewer } from './SourceViewer';
 
+const ACTIVE_CHAT_KEY = 'eka.activeChatId';
+
 const formatConfidence = (value: number) => `${Math.round(value * 100)}%`;
 
 export const ChatPage: React.FC = () => {
@@ -27,7 +29,9 @@ export const ChatPage: React.FC = () => {
     try {
       const items = await chatApi.getConversations();
       setConversations(items);
-      if (!active && items.length) setActive(items[0]);
+      const savedId = sessionStorage.getItem(ACTIVE_CHAT_KEY);
+      const saved = savedId ? items.find(c => c.id === savedId) : null;
+      setActive(prev => prev || saved || items[0] || null);
     } catch (e) {
       error('Unable to load chat history.', 'Chat');
     }
@@ -46,7 +50,7 @@ export const ChatPage: React.FC = () => {
   };
 
   useEffect(() => { loadConversations(); }, []);
-  useEffect(() => { if (active) loadHistory(active); else setMessages([]); }, [active?.id]);
+  useEffect(() => { if (active) { sessionStorage.setItem(ACTIVE_CHAT_KEY, active.id); loadHistory(active); } else { setMessages([]); } }, [active?.id]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
   const newChat = async () => {
@@ -64,21 +68,40 @@ export const ChatPage: React.FC = () => {
   const send = async () => {
     const value = input.trim();
     if (!value || !active || loading) return;
+
     setInput('');
     setLoading(true);
-    const optimistic: ChatMessage = {
-      id: `local-${Date.now()}`, role: 'USER', content: value,
-      createdAt: new Date().toISOString(), citations: [],
+
+    const userMessage: ChatMessage = {
+      id: `local-user-${Date.now()}`,
+      role: 'USER',
+      content: value,
+      createdAt: new Date().toISOString(),
+      citations: [],
     };
-    setMessages(prev => [...prev, optimistic]);
+    const assistantId = `local-assistant-${Date.now()}`;
+    const assistantMessage: ChatMessage = {
+      id: assistantId,
+      role: 'ASSISTANT',
+      content: '',
+      createdAt: new Date().toISOString(),
+      citations: [],
+    };
+
+    setMessages(prev => [...prev, userMessage, assistantMessage]);
+
     try {
-      const result = await chatApi.send(active.id, value);
-      setMessages(prev => [...prev.filter(m => m.id !== optimistic.id), result.userMessage, result.assistantMessage]);
-      setConversations(prev => prev.map(c => c.id === active.id
-        ? { ...c, title: c.title === 'New conversation' ? value.slice(0, 60) : c.title, messageCount: c.messageCount + 2, updatedAt: new Date().toISOString() }
-        : c));
+      await chatApi.stream(active.id, value, token => {
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, content: m.content + token } : m
+        ));
+      });
+
+      // Server is the source of truth: reload the persisted turn, citations and history.
+      await loadHistory(active);
+      await loadConversations();
     } catch (e) {
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+      setMessages(prev => prev.filter(m => m.id !== assistantId && m.id !== userMessage.id));
       error((e as { message?: string }).message || 'Unable to generate an answer.', 'Assistant');
     } finally {
       setLoading(false);
