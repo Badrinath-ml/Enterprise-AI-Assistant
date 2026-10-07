@@ -58,15 +58,22 @@ public class DocumentIngestionService {
     protected void markProcessing(UUID tenantId, UUID documentId) { Document d=find(tenantId,documentId); d.setIngestionStatus(IngestionStatus.PROCESSING); d.setIngestionError(null); documentRepository.save(d); }
 
     protected void replaceChunks(UUID tenantId, UUID documentId, int version, List<String> chunks) {
+        // Never hold a database transaction open while waiting on an external embedding API.
+        List<float[]> embeddings = embeddingService.embedDocuments(chunks);
+        if (embeddings.size() != chunks.size()) {
+            throw new IllegalStateException("Embedding provider returned an unexpected number of vectors");
+        }
+
         transactionTemplate.executeWithoutResult(status -> {
             chunkRepository.deleteForDocument(documentId);
-            List<float[]> embeddings = embeddingService.embedDocuments(chunks);
-            if (embeddings.size() != chunks.size()) {
-                throw new IllegalStateException("Embedding provider returned an unexpected number of vectors");
-            }
             for (int i=0;i<chunks.size();i++) {
                 float[] embedding=embeddings.get(i);
-                if (embedding.length != 768) throw new IllegalStateException("Embedding dimension " + embedding.length + " does not match pgvector dimension 768");
+                if (embedding.length != embeddingService.dimensions()) {
+                    throw new IllegalStateException(
+                            "Embedding dimension " + embedding.length +
+                            " does not match configured dimension " + embeddingService.dimensions()
+                    );
+                }
                 chunkRepository.insert(tenantId,documentId,version,i,chunks.get(i),estimateTokenCount(chunks.get(i)),embedding);
             }
         });
