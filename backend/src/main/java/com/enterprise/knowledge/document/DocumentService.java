@@ -112,7 +112,7 @@ public class DocumentService {
                     ? stripExtension(stored.originalFileName()) : title.trim();
 
             Document document = new Document(
-                    tenant, department, actor, cleanTitle, blankToNull(description),
+                    documentId, tenant, department, actor, cleanTitle, blankToNull(description),
                     stored.originalFileName(), stored.storageKey(), normalizedMime(file, stored.originalFileName()),
                     stored.size()
             );
