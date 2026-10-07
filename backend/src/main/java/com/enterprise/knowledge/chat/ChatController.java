@@ -53,8 +53,7 @@ public class ChatController {
 
     @GetMapping("/sources/{documentId}")
     public ChatSourceResponse source(@PathVariable UUID documentId,
-                                     @RequestParam UUID chunkId,
                                      @AuthenticationPrincipal Jwt jwt) {
-        return chat.source(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), documentId, chunkId);
+        return chat.source(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), documentId);
     }
 }
