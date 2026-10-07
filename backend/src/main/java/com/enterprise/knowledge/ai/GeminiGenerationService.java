@@ -1,6 +1,7 @@
 package com.enterprise.knowledge.ai;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -8,26 +9,38 @@ import org.springframework.web.client.RestClient;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.function.Consumer;
 
 @Service
 public class GeminiGenerationService implements GenerationService, StreamingGenerationService {
     private final RestClient client;
+    private final HttpClient streamingClient;
+    private final ObjectMapper objectMapper;
     private final String model;
     private final String apiKey;
 
     public GeminiGenerationService(
             RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
             @Value("${app.ai.gemini.api-key:}") String apiKey,
             @Value("${app.ai.generation.gemini-model:gemini-3.8-flash}") String model) {
 
         this.apiKey = apiKey;
         this.model = model;
+        this.objectMapper = objectMapper;
         this.client = restClientBuilder
                 .baseUrl("https://generativelanguage.googleapis.com")
                 .defaultHeader("x-goog-api-key", apiKey)
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .build();
+        this.streamingClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(20))
                 .build();
     }
 
@@ -55,42 +68,76 @@ public class GeminiGenerationService implements GenerationService, StreamingGene
     public GenerationResponse stream(GenerationRequest request, Consumer<String> onToken) {
         requireApiKey();
 
-        StringBuilder full = new StringBuilder();
+        try {
+            String body = objectMapper.writeValueAsString(buildRequest(request));
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(
+                            "https://generativelanguage.googleapis.com/v1beta/models/"
+                                    + model + ":streamGenerateContent?alt=sse"))
+                    .timeout(Duration.ofMinutes(3))
+                    .header("x-goog-api-key", apiKey)
+                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                    .header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE)
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                    .build();
 
-        client.post()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/{model}:streamGenerateContent")
-                        .queryParam("alt", "sse")
-                        .build(model))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(buildRequest(request))
-                .exchange((req, response) -> {
-                    try (BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(response.getBody(), StandardCharsets.UTF_8))) {
+            HttpResponse<java.util.stream.Stream<String>> response =
+                    streamingClient.send(httpRequest, HttpResponse.BodyHandlers.ofLines());
 
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            if (!line.startsWith("data:")) {
-                                continue;
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                String errorBody = response.body().reduce("", (a, b) -> a + b);
+                throw new IllegalStateException(
+                        "Gemini streaming request failed (HTTP "
+                                + response.statusCode() + "): " + errorBody);
+            }
+
+            StringBuilder full = new StringBuilder();
+
+            try (java.util.stream.Stream<String> lines = response.body()) {
+                BufferedReader reader = new BufferedReader(
+                        new java.io.Reader() {
+                            private final java.util.Iterator<String> iterator = lines.iterator();
+
+                            @Override
+                            public int read(char[] cbuf, int off, int len) {
+                                if (!iterator.hasNext()) return -1;
+                                String line = iterator.next() + System.lineSeparator();
+                                int count = Math.min(len, line.length());
+                                line.getChars(0, count, cbuf, off);
+                                return count;
                             }
 
-                            String data = line.substring(5).trim();
-                            if (data.isBlank() || "[DONE]".equals(data)) {
-                                continue;
-                            }
+                            @Override
+                            public void close() {}
+                        });
 
-                            JsonNode root = new tools.jackson.databind.ObjectMapper().readTree(data);
-                            appendAnswerText(root, full, onToken);
-                        }
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.startsWith("data:")) {
+                        continue;
                     }
-                    return null;
-                });
 
-        if (full.isEmpty()) {
-            throw new IllegalStateException("Gemini returned no streamed text");
+                    String data = line.substring(5).trim();
+                    if (data.isBlank() || "[DONE]".equals(data)) {
+                        continue;
+                    }
+
+                    JsonNode root = objectMapper.readTree(data);
+                    appendAnswerText(root, full, onToken);
+                }
+            }
+
+            if (full.isEmpty()) {
+                throw new IllegalStateException("Gemini returned no streamed text");
+            }
+
+            return new GenerationResponse(full.toString(), "gemini", model);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Gemini streaming request was interrupted", e);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Gemini streaming request failed: " + e.getMessage(), e);
         }
-
-        return new GenerationResponse(full.toString(), "gemini", model);
     }
 
     private GenerateRequest buildRequest(GenerationRequest request) {
