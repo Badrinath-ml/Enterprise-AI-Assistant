@@ -13,4 +13,13 @@ public class GenerationServiceConfiguration {
             HuggingFaceGenerationService huggingFaceGenerationService) {
         return new FallbackGenerationService(geminiGenerationService, huggingFaceGenerationService);
     }
+    
+    @Bean
+    @Primary
+    StreamingGenerationService streamingGenerationService(
+            GeminiGenerationService geminiGenerationService,
+            HuggingFaceGenerationService huggingFaceGenerationService) {
+        return new FallbackStreamingGenerationService(geminiGenerationService, huggingFaceGenerationService);
+    }
 }
+
