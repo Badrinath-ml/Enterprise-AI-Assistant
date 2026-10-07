@@ -35,6 +35,11 @@ export const documentApi = {
     return response.data;
   },
 
+  async approve(id: string): Promise<DocumentResponse> {
+    const response = await apiClient.post<DocumentResponse>(`/api/v1/documents/${id}/approve`);
+    return response.data;
+  },
+
   async replaceContent(id: string, file: File): Promise<DocumentResponse> {
     const form = new FormData();
     form.append('file', file);
