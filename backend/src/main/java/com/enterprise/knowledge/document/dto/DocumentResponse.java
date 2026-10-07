@@ -2,6 +2,7 @@ package com.enterprise.knowledge.document.dto;
 
 import com.enterprise.knowledge.document.Document;
 import com.enterprise.knowledge.document.DocumentStatus;
+import com.enterprise.knowledge.document.IngestionStatus;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,6 +15,8 @@ public record DocumentResponse(
         String mimeType,
         long fileSize,
         DocumentStatus status,
+        IngestionStatus ingestionStatus,
+        int indexedChunkCount,
         int version,
         UUID departmentId,
         String departmentName,
@@ -31,6 +34,8 @@ public record DocumentResponse(
                 d.getMimeType(),
                 d.getFileSize(),
                 d.getStatus(),
+                d.getIngestionStatus(),
+                d.getIndexedChunkCount(),
                 d.getVersion(),
                 d.getDepartment() == null ? null : d.getDepartment().getId(),
                 d.getDepartment() == null ? null : d.getDepartment().getName(),
