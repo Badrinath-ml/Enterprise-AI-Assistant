@@ -74,7 +74,7 @@ public class DocumentIngestionService {
                             " does not match configured dimension " + embeddingService.dimensions()
                     );
                 }
-                chunkRepository.insert(tenantId,documentId,version,i,chunks.get(i),estimateTokenCount(chunks.get(i)),embedding);
+                chunkRepository.insert(tenantId,documentId,version,i,chunks.get(i),estimateTokenCount(chunks.get(i)),embedding,embeddingService.provider(),embeddingService.model());
             }
         });
     }
