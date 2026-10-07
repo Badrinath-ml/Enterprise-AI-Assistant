@@ -243,7 +243,10 @@ public class ChatService {
                     emitter.send(SseEmitter.event().name("error").data(
                             e.getMessage() == null ? "Unable to generate an answer." : e.getMessage()));
                 } catch (Exception ignored) {}
-                emitter.completeWithError(e);
+                // The error has already been delivered as an SSE event.
+                // Completing normally avoids Spring MVC trying to serialize ApiError
+                // into an already-committed text/event-stream response.
+                emitter.complete();
             } finally {
                 executor.shutdown();
             }
