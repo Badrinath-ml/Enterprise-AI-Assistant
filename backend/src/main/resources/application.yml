@@ -31,6 +31,13 @@ spring:
       max-file-size: 25MB
       max-request-size: 26MB
 
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -47,6 +54,9 @@ management:
 app:
   storage:
     documents-path: ${DOCUMENT_STORAGE_PATH:storage/documents}
+  ingestion:
+    chunk-size: ${INGESTION_CHUNK_SIZE:1200}
+    chunk-overlap: ${INGESTION_CHUNK_OVERLAP:200}
   security:
     jwt:
       # Replace this in any real deployment with a strong secret of >= 32 bytes.
