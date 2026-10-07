@@ -13,9 +13,9 @@ public class DocumentChunkRepository {
         Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM document_chunks WHERE document_id = ? AND document_version = ?", Integer.class, documentId, version);
         return count == null ? 0 : count;
     }
-    public void insert(UUID tenantId, UUID documentId, int version, int index, String content, int tokenCount, float[] embedding) {
-        jdbcTemplate.update("INSERT INTO document_chunks (tenant_id, document_id, document_version, chunk_index, content, token_count, embedding) VALUES (?, ?, ?, ?, ?, ?, ?::vector)",
-                tenantId, documentId, version, index, content, tokenCount, toVectorLiteral(embedding));
+    public void insert(UUID tenantId, UUID documentId, int version, int index, String content, int tokenCount, float[] embedding, String provider, String model) {
+        jdbcTemplate.update("INSERT INTO document_chunks (tenant_id, document_id, document_version, chunk_index, content, token_count, embedding, embedding_provider, embedding_model, embedding_dimensions) VALUES (?, ?, ?, ?, ?, ?, ?::vector, ?, ?, ?)",
+                tenantId, documentId, version, index, content, tokenCount, toVectorLiteral(embedding), provider, model, embedding.length);
     }
     private String toVectorLiteral(float[] embedding) {
         StringBuilder b = new StringBuilder("[");
