@@ -7,8 +7,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -90,8 +88,6 @@ public class GeminiGenerationService implements GenerationService, StreamingGene
                         "Gemini streaming request failed (HTTP "
                                 + response.statusCode() + "): " + errorBody);
             }
-
-            StringBuilder full = new StringBuilder();
 
             StringBuilder full = new StringBuilder();
 
