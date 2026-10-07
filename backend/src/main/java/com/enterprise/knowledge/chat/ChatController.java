@@ -7,6 +7,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -43,6 +45,14 @@ public class ChatController {
                                   @RequestParam String message,
                                   @AuthenticationPrincipal Jwt jwt) {
         return chat.send(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id, message);
+    }
+
+
+    @PostMapping(value = "/conversations/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@PathVariable UUID id,
+                             @RequestParam String message,
+                             @AuthenticationPrincipal Jwt jwt) {
+        return chat.stream(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id, message);
     }
 
     @PostMapping("/conversations/{id}/upload")
