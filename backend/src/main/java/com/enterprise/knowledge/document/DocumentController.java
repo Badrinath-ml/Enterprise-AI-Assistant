@@ -96,6 +96,16 @@ public class DocumentController {
         );
     }
 
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public DocumentResponse approve(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return documentService.approve(
+                TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id
+        );
+    }
+
     @PutMapping("/{id}/content")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public DocumentResponse replaceContent(
