@@ -152,6 +152,17 @@ export const DocumentsPage: React.FC = () => {
       { label: 'Preview', icon: <Eye className="w-4 h-4"/>, onClick: () => openPreview(d) },
       { label: 'Download', icon: <Download className="w-4 h-4"/>, onClick: () => download(d) },
       ...(canManage ? [
+        ...((d.status === 'DRAFT' || d.status === 'PENDING_REVIEW') ? [
+          { label: 'Approve', icon: <RefreshCw className="w-4 h-4"/>, onClick: async () => {
+            try {
+              await documentApi.approve(d.id);
+              success(`"${d.title}" is now approved and available to RAG.`, 'Document Approved');
+              await load(page);
+            } catch (e) {
+              error((e as { message?: string }).message || 'Unable to approve document.', 'Approval Failed');
+            }
+          } }
+        ] : []),
         { label: 'Edit details', icon: <Pencil className="w-4 h-4"/>, onClick: () => setEditing(d) },
         { label: 'Replace file', icon: <Replace className="w-4 h-4"/>, onClick: () => setReplacing(d) },
         { label: 'Delete', icon: <Trash2 className="w-4 h-4"/>, onClick: () => setDeleting(d), danger: true },
