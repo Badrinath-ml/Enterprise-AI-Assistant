@@ -31,13 +31,6 @@ spring:
       max-file-size: 25MB
       max-request-size: 26MB
 
-  ai:
-    ollama:
-      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
-      embedding:
-        options:
-          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
-
 server:
   port: ${SERVER_PORT:8080}
 
@@ -57,6 +50,17 @@ app:
   ingestion:
     chunk-size: ${INGESTION_CHUNK_SIZE:1200}
     chunk-overlap: ${INGESTION_CHUNK_OVERLAP:200}
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+    huggingface:
+      token: ${HF_TOKEN:}
+    embedding:
+      model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-2}
+      dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:768}
+    generation:
+      gemini-model: ${GEMINI_GENERATION_MODEL:gemini-3.8-flash}
+      huggingface-model: ${HF_GENERATION_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}
   security:
     jwt:
       # Replace this in any real deployment with a strong secret of >= 32 bytes.
