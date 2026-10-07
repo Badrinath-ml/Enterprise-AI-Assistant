@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Building2, UserCircle, LogOut, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Building2, UserCircle, LogOut, FileText, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../common/Avatar';
 
