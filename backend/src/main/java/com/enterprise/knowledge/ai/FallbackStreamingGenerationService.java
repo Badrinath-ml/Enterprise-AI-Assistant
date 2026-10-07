@@ -35,6 +35,11 @@ public class FallbackStreamingGenerationService implements StreamingGenerationSe
         } catch (ResourceAccessException e) {
             if (!emitted.get()) return fallback.stream(request, onToken);
             throw e;
+        } catch (IllegalStateException e) {
+            if (!emitted.get() && "Gemini returned no streamed text".equals(e.getMessage())) {
+                return fallback.stream(request, onToken);
+            }
+            throw e;
         }
     }
 }
