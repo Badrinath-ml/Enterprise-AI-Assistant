@@ -6,6 +6,7 @@ import com.enterprise.knowledge.document.dto.DocumentPageResponse;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
 import com.enterprise.knowledge.document.dto.UpdateDocumentRequest;
 import com.enterprise.knowledge.document.storage.FileStorageService;
+import com.enterprise.knowledge.document.ingestion.DocumentIngestionService;
 import com.enterprise.knowledge.tenant.Tenant;
 import com.enterprise.knowledge.tenant.TenantRepository;
 import com.enterprise.knowledge.user.AppUser;
@@ -30,17 +31,20 @@ public class DocumentService {
     private final TenantRepository tenantRepository;
     private final UserService userService;
     private final FileStorageService storage;
+    private final DocumentIngestionService ingestionService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DepartmentRepository departmentRepository,
                            TenantRepository tenantRepository,
                            UserService userService,
-                           FileStorageService storage) {
+                           FileStorageService storage,
+                           DocumentIngestionService ingestionService) {
         this.documentRepository = documentRepository;
         this.departmentRepository = departmentRepository;
         this.tenantRepository = tenantRepository;
         this.userService = userService;
         this.storage = storage;
+        this.ingestionService = ingestionService;
     }
 
     @Transactional(readOnly = true)
@@ -58,20 +62,28 @@ public class DocumentService {
         }
 
         Pageable pageable = PageRequest.of(safePage, safeSize);
-        String search = q == null || q.isBlank() ? null : q.trim();
+        String search = q == null || q.isBlank() ? "" : q.trim();
         Page<Document> result;
 
         if (admin) {
-            result = departmentFilter == null
-                    ? documentRepository.searchAdmin(tenantId, status, search, pageable)
-                    : documentRepository.searchAdminByDepartment(
-                            tenantId, departmentFilter, status, search, pageable);
+            if (departmentFilter == null) {
+                result = status == null
+                        ? documentRepository.searchAdmin(tenantId, search, pageable)
+                        : documentRepository.searchAdminByStatus(tenantId, status, search, pageable);
+            } else {
+                result = status == null
+                        ? documentRepository.searchAdminByDepartment(tenantId, departmentFilter, search, pageable)
+                        : documentRepository.searchAdminByDepartmentAndStatus(
+                                tenantId, departmentFilter, status, search, pageable);
+            }
         } else {
             if (scopeDepartment == null) {
                 result = Page.empty(pageable);
             } else {
-                result = documentRepository.searchDepartment(
-                        tenantId, scopeDepartment, status, search, pageable);
+                result = status == null
+                        ? documentRepository.searchDepartment(tenantId, scopeDepartment, search, pageable)
+                        : documentRepository.searchDepartmentByStatus(
+                                tenantId, scopeDepartment, status, search, pageable);
             }
         }
         return new DocumentPageResponse(
@@ -104,6 +116,8 @@ public class DocumentService {
                     stored.size()
             );
             documentRepository.save(document);
+            ingestionService.markQueued(tenantId, documentId);
+            ingestionService.queue(tenantId, documentId);
             return DocumentResponse.from(document);
         } catch (IOException | RuntimeException e) {
             if (stored != null) {
@@ -146,6 +160,8 @@ public class DocumentService {
                     normalizedMime(file, stored.originalFileName()), stored.size()
             );
             DocumentResponse response = DocumentResponse.from(documentRepository.save(document));
+            ingestionService.markQueued(tenantId, documentId);
+            ingestionService.queue(tenantId, documentId);
             try { storage.delete(oldKey); } catch (IOException ignored) {}
             return response;
         } catch (IOException | RuntimeException e) {
