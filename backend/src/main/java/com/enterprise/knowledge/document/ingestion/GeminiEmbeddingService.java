@@ -73,13 +73,12 @@ public class GeminiEmbeddingService implements EmbeddingService {
         for (String text : texts) {
             String prepared = query
                     ? "task: search result | query: " + text
-                    : "title: none | text: " + text;
+                    : text;
 
             requests.add(new EmbedRequest(
                     "models/" + model,
-                    new Content(List.of(new Part(text))),
-                    query ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
-                    DIMENSIONS
+                    new Content(List.of(new Part(prepared))),
+                    new EmbedContentConfig(DIMENSIONS)
             ));
         }
 
@@ -138,7 +137,8 @@ public class GeminiEmbeddingService implements EmbeddingService {
     }
 
     private record BatchEmbedRequest(List<Object> requests) {}
-    private record EmbedRequest(String model, Content content, String taskType, int outputDimensionality) {}
+    private record EmbedRequest(String model, Content content, EmbedContentConfig embedContentConfig) {}
+    private record EmbedContentConfig(int outputDimensionality) {}
     private record Content(List<Part> parts) {}
     private record Part(String text) {}
 }
