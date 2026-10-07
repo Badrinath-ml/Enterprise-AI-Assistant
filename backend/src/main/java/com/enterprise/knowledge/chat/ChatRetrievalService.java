@@ -61,7 +61,7 @@ public class ChatRetrievalService {
                 rs.getString("original_file_name"),
                 rs.getString("mime_type"),
                 rs.getDouble("similarity")
-        ));
+        )).stream().filter(c -> c.similarity() >= 0.35).toList();
     }
 
     private String toVectorLiteral(float[] vector) {
