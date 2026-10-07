@@ -53,22 +53,22 @@ export const chatApi = {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      const events = buffer.split(/\\r?\\n\\r?\\n/);
+      const events = buffer.split(/\r?\n\r?\n/);
       buffer = events.pop() || '';
 
       for (const event of events) {
-        const data = event
-          .split(/\\r?\\n/)
+        const lines = event.split(/\r?\n/);
+        const eventType = lines.find(line => line.startsWith('event:'))?.slice(6).trim() || 'message';
+        const data = lines
           .filter(line => line.startsWith('data:'))
-          .map(line => line.slice(5).trim())
-          .join('\\n');
+          .map(line => line.slice(5).replace(/^ /, ''))
+          .join('\n');
 
         if (!data) continue;
-        try {
-          const parsed = JSON.parse(data) as { conversationId?: string; provider?: string; model?: string };
-          if (parsed.conversationId) continue;
-        } catch {
+        if (eventType === 'token') {
           onToken(data);
+        } else if (eventType === 'error') {
+          throw new Error(data);
         }
       }
     }
