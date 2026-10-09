@@ -7,15 +7,12 @@ import {
   Sparkles,
   Paperclip,
   Loader2,
-  ChevronLeft,
   BookOpen,
   Trash2,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   LayoutDashboard,
-  Shield,
-  HelpCircle,
   CheckCircle2,
 } from 'lucide-react';
 import { chatApi } from '../../api/chat';
@@ -618,18 +615,18 @@ export const ChatPage: React.FC = () => {
                                 >
                                   <div className="flex items-start justify-between gap-1">
                                     <span className="text-xs font-semibold text-slate-200 group-hover:text-indigo-300 truncate">
-                                      {c.documentTitle || 'Reference Document'}
+                                      {c.title || c.fileName || 'Reference Document'}
                                     </span>
                                     <span className="text-[10px] text-indigo-400 shrink-0 font-mono">
-                                      {Math.round(c.score * 100)}%
+                                      {Math.round((c.confidence ?? c.similarity ?? 0) * 100)}%
                                     </span>
                                   </div>
                                   <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-normal font-sans">
                                     {c.snippet}
                                   </p>
-                                  {c.sourceLocator && (
+                                  {(c.locatorLabel || c.pageNumber != null) && (
                                     <p className="text-[10px] text-slate-500 mt-1 truncate">
-                                      {c.sourceLocator}
+                                      {c.locatorLabel || `Page ${c.pageNumber}`}
                                     </p>
                                   )}
                                 </button>
