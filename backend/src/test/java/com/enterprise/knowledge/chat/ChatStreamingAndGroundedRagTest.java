@@ -63,7 +63,7 @@ class ChatStreamingAndGroundedRagTest {
         chatService = new ChatService(
                 conversations, messages, citations, null, retrieval, generation,
                 streamingGeneration, intentRouter, userService, null, documentService,
-                null, null, null, storage, null, persistence, null
+                null, storage, mock(ChatAttachmentIngestionService.class), persistence, null
         );
 
         Tenant tenant = new Tenant(tenantId, "Acme Corp", "acme");
