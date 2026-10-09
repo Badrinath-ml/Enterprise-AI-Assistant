@@ -1,5 +1,7 @@
 package com.enterprise.knowledge.document.ingestion;
 
+import com.enterprise.knowledge.chat.ChatConversationAttachment;
+import com.enterprise.knowledge.chat.ChatConversationAttachmentRepository;
 import com.enterprise.knowledge.common.exception.ResourceNotFoundException;
 import com.enterprise.knowledge.document.Document;
 import com.enterprise.knowledge.document.DocumentRepository;
@@ -8,6 +10,7 @@ import com.enterprise.knowledge.document.dto.DocumentIngestionResponse;
 import com.enterprise.knowledge.document.storage.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -32,6 +35,9 @@ public class DocumentIngestionService {
     private final TextChunker chunker;
     private final EmbeddingService embeddingService;
     private final TransactionTemplate transactionTemplate;
+
+    @Autowired(required = false)
+    private ChatConversationAttachmentRepository attachmentRepository;
 
     public DocumentIngestionService(DocumentRepository documentRepository, DocumentChunkRepository chunkRepository,
                                     FileStorageService storage, DocumentTextExtractorService extractor,
@@ -147,9 +153,23 @@ public class DocumentIngestionService {
 
     @Transactional(readOnly = true)
     public DocumentIngestionResponse status(UUID tenantId, UUID documentId) {
-        Document d = find(tenantId, documentId);
-        return new DocumentIngestionResponse(d.getId(), d.getVersion(), d.getIngestionStatus(),
-                d.getIndexedChunkCount(), d.getIndexedAt(), d.getIngestionError());
+        var optDoc = documentRepository.findByIdAndTenantId(documentId, tenantId);
+        if (optDoc.isPresent()) {
+            Document d = optDoc.get();
+            return new DocumentIngestionResponse(d.getId(), d.getVersion(), d.getIngestionStatus(),
+                    d.getIndexedChunkCount(), d.getIndexedAt(), d.getIngestionError());
+        }
+
+        if (attachmentRepository != null) {
+            var optAtt = attachmentRepository.findByIdAndTenantId(documentId, tenantId);
+            if (optAtt.isPresent()) {
+                ChatConversationAttachment a = optAtt.get();
+                return new DocumentIngestionResponse(a.getId(), 1, a.getIngestionStatus(),
+                        a.getIndexedChunkCount(), a.getCreatedAt(), a.getIngestionError());
+            }
+        }
+
+        throw new ResourceNotFoundException("Document not found");
     }
 
     private Document find(UUID tenantId, UUID documentId) {

@@ -17,9 +17,13 @@ public class ChatCitation {
     @JoinColumn(name = "message_id", nullable = false)
     private ChatMessage message;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "document_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "document_id", nullable = true)
     private Document document;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "attachment_id", nullable = true)
+    private ChatConversationAttachment attachment;
 
     @Column(nullable = false)
     private int documentVersion;
@@ -46,9 +50,16 @@ public class ChatCitation {
     public ChatCitation(UUID id, ChatMessage message, Document document, int documentVersion,
                         UUID chunkId, int chunkIndex, double similarity, String snippet,
                         Integer pageNumber, String locatorLabel) {
+        this(id, message, document, null, documentVersion, chunkId, chunkIndex, similarity, snippet, pageNumber, locatorLabel);
+    }
+
+    public ChatCitation(UUID id, ChatMessage message, Document document, ChatConversationAttachment attachment,
+                        int documentVersion, UUID chunkId, int chunkIndex, double similarity, String snippet,
+                        Integer pageNumber, String locatorLabel) {
         this.id = id;
         this.message = message;
         this.document = document;
+        this.attachment = attachment;
         this.documentVersion = documentVersion;
         this.chunkId = chunkId;
         this.chunkIndex = chunkIndex;
@@ -61,6 +72,7 @@ public class ChatCitation {
     public UUID getId() { return id; }
     public ChatMessage getMessage() { return message; }
     public Document getDocument() { return document; }
+    public ChatConversationAttachment getAttachment() { return attachment; }
     public int getDocumentVersion() { return documentVersion; }
     public UUID getChunkId() { return chunkId; }
     public int getChunkIndex() { return chunkIndex; }

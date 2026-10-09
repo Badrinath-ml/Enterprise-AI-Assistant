@@ -1,49 +1,238 @@
-import React, { useMemo } from 'react';
-import { FileText, FileType2, Hash } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  FileType2,
+  Hash,
+  Sparkles,
+  Target,
+} from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { ChatCitation, ChatSource } from '../../types/chat';
 
 interface Props {
   citation: ChatCitation | null;
+  allCitations?: ChatCitation[];
   source: ChatSource | null;
+  onSelectCitation?: (citation: ChatCitation) => void;
   onClose: () => void;
 }
 
-export const SourceViewer: React.FC<Props> = ({ citation, source, onClose }) => {
-  const parts = useMemo(() => {
-    if (!citation || !source) return null;
-    const needle = citation.snippet.trim();
-    if (!needle) return { before: source.text, match: '', after: '' };
-    const index = source.text.toLowerCase().indexOf(needle.toLowerCase());
-    if (index < 0) return { before: source.text, match: '', after: '' };
-    return {
-      before: source.text.slice(0, index),
-      match: source.text.slice(index, index + needle.length),
-      after: source.text.slice(index + needle.length),
-    };
+export const SourceViewer: React.FC<Props> = ({
+  citation,
+  allCitations = [],
+  source,
+  onSelectCitation,
+  onClose,
+}) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Clean and find best highlight match
+  const highlightResult = useMemo(() => {
+    if (!citation || !source || !source.text) {
+      return { before: '', match: '', after: '', found: false };
+    }
+
+    const docText = source.text;
+    const rawSnippet = citation.snippet || '';
+
+    // Strip leading/trailing ellipsis, quotes, or markdown
+    const cleanSnippet = rawSnippet
+      .replace(/^[\s…"'.*#>-]+/, '')
+      .replace(/[\s…"'.*#>-]+$/, '')
+      .trim();
+
+    if (!cleanSnippet) {
+      return { before: docText, match: '', after: '', found: false };
+    }
+
+    // 1. Direct case-insensitive match
+    const lowerDoc = docText.toLowerCase();
+    const lowerNeedle = cleanSnippet.toLowerCase();
+    let matchIndex = lowerDoc.indexOf(lowerNeedle);
+    let matchLength = cleanSnippet.length;
+
+    // 2. Fallback: match by first significant sentence or phrase (>= 25 chars)
+    if (matchIndex < 0) {
+      const sentences = cleanSnippet
+        .split(/[.\n;]+/)
+        .map(s => s.trim())
+        .filter(s => s.length >= 25);
+
+      for (const sentence of sentences) {
+        const idx = lowerDoc.indexOf(sentence.toLowerCase());
+        if (idx >= 0) {
+          matchIndex = idx;
+          matchLength = sentence.length;
+          break;
+        }
+      }
+    }
+
+    // 3. Fallback: match normalized whitespace
+    if (matchIndex < 0) {
+      const normalizedNeedle = cleanSnippet.replace(/\s+/g, ' ');
+      // Try chunks of 30 characters
+      const sample = normalizedNeedle.slice(0, 40);
+      const idx = lowerDoc.indexOf(sample.toLowerCase());
+      if (idx >= 0) {
+        matchIndex = idx;
+        matchLength = Math.min(cleanSnippet.length, docText.length - idx);
+      }
+    }
+
+    if (matchIndex >= 0) {
+      return {
+        before: docText.slice(0, matchIndex),
+        match: docText.slice(matchIndex, matchIndex + matchLength),
+        after: docText.slice(matchIndex + matchLength),
+        found: true,
+      };
+    }
+
+    return { before: docText, match: '', after: '', found: false };
   }, [citation, source]);
+
+  // Scroll highlight into view whenever citation or match changes
+  useEffect(() => {
+    if (highlightResult.found) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('active-source-highlight');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightResult.found, citation?.id]);
+
+  const scrollToHighlight = () => {
+    const el = document.getElementById('active-source-highlight');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   if (!citation || !source) return null;
 
-  const isPdf = source.mimeType === 'application/pdf';
-  const isDocx = source.mimeType.includes('wordprocessingml');
+  const isPdf = source.mimeType === 'application/pdf' || source.fileName.toLowerCase().endsWith('.pdf');
+
+  // Find index of current citation in allCitations
+  const currentIndex = allCitations.findIndex(c => c.id === citation.id || (c.documentId === citation.documentId && c.chunkId === citation.chunkId));
+  const hasMultiple = allCitations.length > 1;
 
   return (
-    <Modal isOpen={!!citation && !!source} onClose={onClose}
-      title={source.title} description={`${source.fileName} · v${source.version}`} size="xl">
-      <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
-        {isPdf ? <FileType2 className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-        <span>{isPdf ? 'PDF source' : isDocx ? 'DOCX source' : 'Text source'}</span>
-        {citation.pageNumber && <span className="ml-auto inline-flex items-center gap-1"><Hash className="w-3 h-3" />Page {citation.pageNumber}</span>}
+    <Modal
+      isOpen={!!citation && !!source}
+      onClose={onClose}
+      title={source.title || source.fileName}
+      description={`${source.fileName} · v${source.version}`}
+      size="xl"
+    >
+      <div className="flex flex-col h-[70vh] -mt-2">
+        {/* Document header / citation navigation toolbar */}
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl mb-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 shadow-2xs">
+              {isPdf ? <FileType2 className="w-4 h-4 text-rose-500" /> : <FileText className="w-4 h-4 text-blue-500" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-900">{source.fileName}</span>
+                {citation.pageNumber && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-full">
+                    <Hash className="w-2.5 h-2.5" /> Page {citation.pageNumber}
+                  </span>
+                )}
+                <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                  {Math.round(citation.confidence * 100)}% Match
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Citation navigation buttons (if multiple citations available) */}
+          {hasMultiple && onSelectCitation && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="text-[11px] text-slate-500 font-medium mr-1">
+                Citation {currentIndex >= 0 ? currentIndex + 1 : 1} of {allCitations.length}
+              </span>
+              <button
+                type="button"
+                disabled={currentIndex <= 0}
+                onClick={() => {
+                  if (currentIndex > 0) onSelectCitation(allCitations[currentIndex - 1]);
+                }}
+                className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-600 transition-colors"
+                title="Previous citation"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={currentIndex < 0 || currentIndex >= allCitations.length - 1}
+                onClick={() => {
+                  if (currentIndex < allCitations.length - 1) onSelectCitation(allCitations[currentIndex + 1]);
+                }}
+                className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-600 transition-colors"
+                title="Next citation"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Retrieved answer snippet preview banner */}
+        <div className="mb-3 px-3.5 py-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 flex items-start justify-between gap-3 shadow-2xs">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900 mb-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              Retrieved Answer Point
+            </div>
+            <p className="text-xs text-amber-950 font-sans leading-relaxed line-clamp-2">
+              "{citation.snippet}"
+            </p>
+          </div>
+          {highlightResult.found && (
+            <button
+              type="button"
+              onClick={scrollToHighlight}
+              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-200/70 hover:bg-amber-200 px-2.5 py-1 rounded-md border border-amber-300 transition-colors"
+            >
+              <Target className="w-3 h-3" />
+              Jump to Answer
+            </button>
+          )}
+        </div>
+
+        {/* Document content viewer with highlighted passage */}
+        <div
+          ref={contentRef}
+          className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 text-sm font-sans leading-7 text-slate-800 shadow-2xs relative"
+        >
+          {highlightResult.found ? (
+            <div className="whitespace-pre-wrap">
+              {highlightResult.before}
+              <mark
+                id="active-source-highlight"
+                className="bg-amber-200/90 text-slate-950 px-1 py-0.5 rounded font-semibold border-b-2 border-amber-500 shadow-xs ring-2 ring-amber-300/60"
+              >
+                {highlightResult.match}
+              </mark>
+              {highlightResult.after}
+            </div>
+          ) : (
+            <div>
+              <div className="mb-4 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+                <span>The extracted snippet was normalized during ingestion. Full document text is displayed below.</span>
+              </div>
+              <div className="whitespace-pre-wrap">{source.text}</div>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-5">
-        <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-slate-700">
-          {parts?.before}
-          {parts?.match ? <mark className="rounded bg-yellow-200 px-1 py-0.5 text-slate-950">{parts.match}</mark> : null}
-          {parts?.after}
-        </pre>
-      </div>
-      {!parts?.match && <p className="mt-2 text-[11px] text-amber-600">The stored chunk text was normalized during ingestion, so an exact text span was not found in the extracted source.</p>}
     </Modal>
   );
 };

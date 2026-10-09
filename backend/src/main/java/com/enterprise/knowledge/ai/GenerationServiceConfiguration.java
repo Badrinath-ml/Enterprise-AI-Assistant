@@ -6,20 +6,20 @@ import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class GenerationServiceConfiguration {
+
     @Bean
     @Primary
     GenerationService generationService(
-            GeminiGenerationService geminiGenerationService,
+            GrokGenerationService grokGenerationService,
             HuggingFaceGenerationService huggingFaceGenerationService) {
-        return new FallbackGenerationService(geminiGenerationService, huggingFaceGenerationService);
+        return new FallbackGenerationService(grokGenerationService, huggingFaceGenerationService);
     }
-    
+
     @Bean
     @Primary
     StreamingGenerationService streamingGenerationService(
-            GeminiGenerationService geminiGenerationService,
+            GrokGenerationService grokGenerationService,
             HuggingFaceGenerationService huggingFaceGenerationService) {
-        return new FallbackStreamingGenerationService(geminiGenerationService, huggingFaceGenerationService);
+        return new FallbackStreamingGenerationService(grokGenerationService, huggingFaceGenerationService);
     }
 }
-

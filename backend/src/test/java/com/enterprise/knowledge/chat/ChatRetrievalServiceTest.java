@@ -34,13 +34,13 @@ class ChatRetrievalServiceTest {
     void setUp() {
         chatRetrievalService = new ChatRetrievalService(jdbcTemplate, embeddingService, 0.50);
         lenient().when(embeddingService.embedQuery(anyString())).thenReturn(new float[]{0.1f, 0.2f, 0.3f});
-        lenient().when(embeddingService.provider()).thenReturn("google");
-        lenient().when(embeddingService.model()).thenReturn("text-embedding-004");
+        lenient().when(embeddingService.provider()).thenReturn("sentence-transformers");
+        lenient().when(embeddingService.model()).thenReturn("all-mpnet-base-v2");
         lenient().when(embeddingService.dimensions()).thenReturn(768);
     }
 
     @Test
-    @DisplayName("Admin retrieval queries across tenant without department filtering")
+    @DisplayName("Admin retrieval queries across tenant without department filtering in hybrid pipeline")
     void adminRetrievalAcrossTenant() {
         UUID tenantId = UUID.randomUUID();
         when(jdbcTemplate.query(anyString(), any(Object[].class), any(RowMapper.class)))
@@ -50,16 +50,20 @@ class ChatRetrievalServiceTest {
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), paramsCaptor.capture(), any(RowMapper.class));
+        verify(jdbcTemplate, atLeastOnce()).query(sqlCaptor.capture(), paramsCaptor.capture(), any(RowMapper.class));
 
-        String sql = sqlCaptor.getValue();
-        Object[] params = paramsCaptor.getValue();
+        List<String> allSql = sqlCaptor.getAllValues();
+        assertThat(allSql).isNotEmpty();
 
-        assertThat(sql).contains("c.tenant_id = ?");
-        assertThat(sql).contains("d.tenant_id = ?");
-        assertThat(sql).doesNotContain("d.department_id =");
-        assertThat(params[1]).isEqualTo(tenantId);
-        assertThat(params[2]).isEqualTo(tenantId);
+        // First query is dense vector search
+        String denseSql = allSql.getFirst();
+        assertThat(denseSql).contains("c.tenant_id = ?");
+        assertThat(denseSql).contains("d.tenant_id = ?");
+        assertThat(denseSql).doesNotContain("d.department_id =");
+
+        Object[] denseParams = paramsCaptor.getAllValues().getFirst();
+        assertThat(denseParams[1]).isEqualTo(tenantId);
+        assertThat(denseParams[2]).isEqualTo(tenantId);
     }
 
     @Test
@@ -74,13 +78,13 @@ class ChatRetrievalServiceTest {
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), paramsCaptor.capture(), any(RowMapper.class));
+        verify(jdbcTemplate, atLeastOnce()).query(sqlCaptor.capture(), paramsCaptor.capture(), any(RowMapper.class));
 
-        String sql = sqlCaptor.getValue();
-        Object[] params = paramsCaptor.getValue();
-
-        assertThat(sql).contains("(d.department_id IS NULL OR d.department_id = ?)");
-        assertThat(params).contains(deptId);
+        List<String> allSql = sqlCaptor.getAllValues();
+        assertThat(allSql).isNotEmpty();
+        String denseSql = allSql.getFirst();
+        assertThat(denseSql).contains("(d.department_id IS NULL OR d.department_id = ?)");
+        assertThat(paramsCaptor.getAllValues().getFirst()).contains(deptId);
     }
 
     @Test
@@ -93,10 +97,11 @@ class ChatRetrievalServiceTest {
         chatRetrievalService.retrieve(tenantId, null, false, "company code of conduct", 5);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbcTemplate).query(sqlCaptor.capture(), any(Object[].class), any(RowMapper.class));
+        verify(jdbcTemplate, atLeastOnce()).query(sqlCaptor.capture(), any(Object[].class), any(RowMapper.class));
 
-        String sql = sqlCaptor.getValue();
-        assertThat(sql).contains("d.department_id IS NULL");
+        List<String> allSql = sqlCaptor.getAllValues();
+        assertThat(allSql).isNotEmpty();
+        assertThat(allSql.getFirst()).contains("d.department_id IS NULL");
     }
 
     @Test
@@ -114,7 +119,8 @@ class ChatRetrievalServiceTest {
         );
 
         when(jdbcTemplate.query(anyString(), any(Object[].class), any(RowMapper.class)))
-                .thenReturn(List.of(highMatch, lowMatch));
+                .thenReturn(List.of(highMatch, lowMatch))
+                .thenReturn(List.of());
 
         List<ChatRetrievalService.RetrievedChunk> results = chatRetrievalService.retrieve(tenantId, null, true, "query", 5);
 

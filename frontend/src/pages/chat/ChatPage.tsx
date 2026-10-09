@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FileUp, Plus, Send, Sparkles, User, Paperclip, Loader2, ChevronLeft, BookOpen } from 'lucide-react';
+import { FileUp, Plus, Send, Sparkles, User, Paperclip, Loader2, ChevronLeft, BookOpen, Trash2 } from 'lucide-react';
 import { chatApi } from '../../api/chat';
 import { ChatCitation, ChatConversation, ChatMessage, ChatSource } from '../../types/chat';
 import { useToast } from '../../hooks/useToast';
 import { SourceViewer } from './SourceViewer';
+import { SourcesModal } from './SourcesModal';
+import { MarkdownRenderer } from '../../components/chat/MarkdownRenderer';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 
 const ACTIVE_CHAT_KEY = 'eka.activeChatId';
-
-const formatConfidence = (value: number) => `${Math.round(value * 100)}%`;
 
 export const ChatPage: React.FC = () => {
   const { error, success } = useToast();
@@ -19,8 +20,17 @@ export const ChatPage: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [attachedName, setAttachedName] = useState('');
+
+  // Sources modal and Document Viewer state
+  const [activeMessageCitations, setActiveMessageCitations] = useState<ChatCitation[] | null>(null);
+  const [currentCitationsList, setCurrentCitationsList] = useState<ChatCitation[]>([]);
   const [sourceCitation, setSourceCitation] = useState<ChatCitation | null>(null);
   const [source, setSource] = useState<ChatSource | null>(null);
+
+  // In-app conversation deletion state
+  const [deletingConversation, setDeletingConversation] = useState<ChatConversation | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [mobileHistory, setMobileHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -32,7 +42,7 @@ export const ChatPage: React.FC = () => {
       const savedId = sessionStorage.getItem(ACTIVE_CHAT_KEY);
       const saved = savedId ? items.find(c => c.id === savedId) : null;
       setActive(prev => prev || saved || items[0] || null);
-    } catch (e) {
+    } catch {
       error('Unable to load chat history.', 'Chat');
     }
   };
@@ -42,7 +52,7 @@ export const ChatPage: React.FC = () => {
     try {
       const result = await chatApi.getHistory(conversation.id);
       setMessages(result.messages);
-    } catch (e) {
+    } catch {
       error('Unable to load this conversation.', 'Chat');
     } finally {
       setLoadingHistory(false);
@@ -62,6 +72,26 @@ export const ChatPage: React.FC = () => {
       setMobileHistory(false);
     } catch {
       error('Unable to create a conversation.', 'Chat');
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingConversation) return;
+    setIsDeleting(true);
+    try {
+      await chatApi.deleteConversation(deletingConversation.id);
+      setConversations(prev => prev.filter(c => c.id !== deletingConversation.id));
+      if (active?.id === deletingConversation.id) {
+        sessionStorage.removeItem(ACTIVE_CHAT_KEY);
+        setActive(null);
+        setMessages([]);
+      }
+      success('Conversation deleted.', 'Chat');
+      setDeletingConversation(null);
+    } catch {
+      error('Unable to delete conversation.', 'Chat');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -145,13 +175,29 @@ export const ChatPage: React.FC = () => {
     }
   };
 
-  const openSource = async (citation: ChatCitation) => {
+  const openSourceDocument = async (citation: ChatCitation, citationsList: ChatCitation[]) => {
     setSourceCitation(citation);
+    setCurrentCitationsList(citationsList);
+    setActiveMessageCitations(null); // Close the intermediate modal if open
     try {
-      setSource(await chatApi.source(citation.documentId));
+      const docSource = await chatApi.source(citation.documentId);
+      setSource(docSource);
     } catch {
       setSourceCitation(null);
       error('Unable to open the source document.', 'Source');
+    }
+  };
+
+  const handleSelectCitationInViewer = async (newCitation: ChatCitation) => {
+    setSourceCitation(newCitation);
+    // If the citation points to a different document, load its text
+    if (!source || source.documentId !== newCitation.documentId) {
+      try {
+        const docSource = await chatApi.source(newCitation.documentId);
+        setSource(docSource);
+      } catch {
+        error('Unable to load citation document.', 'Source');
+      }
     }
   };
 
@@ -160,15 +206,27 @@ export const ChatPage: React.FC = () => {
       <aside className={`w-64 bg-slate-50 border-r border-slate-200 flex-col ${mobileHistory ? 'flex' : 'hidden'} lg:flex`}>
         <div className="p-3 border-b border-slate-200 flex items-center justify-between">
           <div><p className="text-xs font-semibold text-slate-900">Chat history</p><p className="text-[10px] text-slate-400">Your conversations</p></div>
-          <button onClick={newChat} className="p-1.5 rounded-md hover:bg-white text-slate-600" title="New chat"><Plus className="w-4 h-4"/></button>
+          <button onClick={newChat} className="p-1.5 rounded-md hover:bg-white text-slate-600 transition-colors" title="New chat"><Plus className="w-4 h-4"/></button>
         </div>
         <div className="p-2 space-y-1 overflow-y-auto flex-1">
           {conversations.map(c => (
-            <button key={c.id} onClick={() => { setActive(c); setMobileHistory(false); }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-colors ${active?.id === c.id ? 'bg-white border border-slate-200 shadow-xs text-slate-900' : 'text-slate-600 hover:bg-white'}`}>
-              <p className="font-medium truncate">{c.title}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{c.messageCount} messages</p>
-            </button>
+            <div key={c.id} className="relative group">
+              <button onClick={() => { setActive(c); setMobileHistory(false); }}
+                className={`w-full text-left px-3 py-2.5 pr-8 rounded-lg text-xs transition-colors ${active?.id === c.id ? 'bg-white border border-slate-200 shadow-xs text-slate-900' : 'text-slate-600 hover:bg-white'}`}>
+                <p className="font-medium truncate">{c.title}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{c.messageCount} messages</p>
+              </button>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  setDeletingConversation(c);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                title="Delete conversation">
+                <Trash2 className="w-3.5 h-3.5"/>
+              </button>
+            </div>
           ))}
           {!conversations.length && <div className="text-center text-[11px] text-slate-400 py-10">No conversations yet.</div>}
         </div>
@@ -197,29 +255,35 @@ export const ChatPage: React.FC = () => {
           ) : messages.length ? (
             messages.map(m => (
               <div key={m.id} className={`flex gap-3 ${m.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
-                {m.role === 'ASSISTANT' && <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0"><Sparkles className="w-3.5 h-3.5"/></div>}
+                {m.role === 'ASSISTANT' && <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0 mt-0.5"><Sparkles className="w-3.5 h-3.5"/></div>}
                 <div className={`max-w-3xl ${m.role === 'USER' ? 'bg-slate-900 text-white rounded-2xl rounded-br-md px-4 py-3' : 'min-w-0'}`}>
-                  <div className="whitespace-pre-wrap text-sm leading-7">{m.content}</div>
-                  {m.role === 'ASSISTANT' && m.citations.length > 0 && (
-                    <div className="mt-4 border-t border-slate-200 pt-3">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 mb-2"><BookOpen className="w-3.5 h-3.5"/> Sources</div>
-                      <div className="flex flex-wrap gap-2">
-                        {m.citations.map(c => (
-                          <button key={c.id} onClick={() => openSource(c)}
-                            className="text-left rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-2 min-w-[210px]">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] font-semibold text-slate-800 truncate">{c.title}</span>
-                              <span className="text-[10px] font-semibold text-slate-500">{formatConfidence(c.confidence)}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">{c.pageNumber ? `Page ${c.pageNumber} · ` : ''}{c.fileName}</div>
-                            <div className="text-[10px] text-slate-500 mt-1 line-clamp-2">{c.snippet}</div>
+                  {m.role === 'USER' ? (
+                    <div className="whitespace-pre-wrap text-sm leading-6">{m.content}</div>
+                  ) : (
+                    <>
+                      <MarkdownRenderer content={m.content} />
+                      {m.citations && m.citations.length > 0 && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setActiveMessageCitations(m.citations)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 hover:bg-slate-200/90 text-slate-700 border border-slate-200/80 transition-all hover:shadow-2xs group cursor-pointer"
+                            title="Click to view all retrieved sources & evidence"
+                          >
+                            <BookOpen className="w-3.5 h-3.5 text-indigo-600 group-hover:scale-105 transition-transform" />
+                            <span className="font-semibold text-slate-800">
+                              {m.citations.length} {m.citations.length === 1 ? 'Source' : 'Sources'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 group-hover:text-slate-600 font-normal">
+                              · View evidence
+                            </span>
                           </button>
-                        ))}
-                      </div>
-                    </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
-                {m.role === 'USER' && <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0"><User className="w-3.5 h-3.5"/></div>}
+                {m.role === 'USER' && <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 mt-0.5"><User className="w-3.5 h-3.5"/></div>}
               </div>
             ))
           ) : (
@@ -260,11 +324,39 @@ export const ChatPage: React.FC = () => {
               rows={1} placeholder="Ask about your enterprise knowledge..." className="flex-1 resize-none outline-none text-sm px-1 py-2 max-h-32 bg-transparent" />
             <button disabled={!input.trim() || !active || loading || uploading} onClick={send} className="p-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40"><Send className="w-4 h-4"/></button>
           </div>
-          <p className="text-[10px] text-slate-400 mt-2 text-center">Grounded answers only · Sources are clickable · Enter to send · Shift+Enter for a new line</p>
+          <p className="text-[10px] text-slate-400 mt-2 text-center">Grounded answers only · Sources capsule opens evidence · Enter to send · Shift+Enter for a new line</p>
         </div>
       </section>
 
-      <SourceViewer citation={sourceCitation} source={source} onClose={() => { setSourceCitation(null); setSource(null); }} />
+      {/* Sources list modal (opened from the capsule) */}
+      <SourcesModal
+        isOpen={!!activeMessageCitations}
+        citations={activeMessageCitations || []}
+        onClose={() => setActiveMessageCitations(null)}
+        onSelectCitation={c => openSourceDocument(c, activeMessageCitations || [])}
+      />
+
+      {/* Document interface with highlighted answers and citation navigation */}
+      <SourceViewer
+        citation={sourceCitation}
+        allCitations={currentCitationsList}
+        source={source}
+        onSelectCitation={handleSelectCitationInViewer}
+        onClose={() => { setSourceCitation(null); setSource(null); }}
+      />
+
+      {/* In-app confirmation dialog for deleting conversations */}
+      <ConfirmDialog
+        isOpen={!!deletingConversation}
+        title="Delete Conversation"
+        message={`Are you sure you want to delete "${deletingConversation?.title || 'this chat'}"? All chat history and private attachments will be permanently removed.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingConversation(null)}
+      />
     </div>
   );
 };

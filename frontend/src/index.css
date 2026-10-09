@@ -32,3 +32,93 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Chat Markdown Formatting */
+.chat-markdown {
+  @apply text-sm leading-relaxed text-slate-800 break-words;
+}
+
+.chat-markdown h1 {
+  @apply text-base sm:text-lg font-bold text-slate-900 mt-4 mb-2 pb-1 border-b border-slate-200;
+}
+
+.chat-markdown h2 {
+  @apply text-sm sm:text-base font-semibold text-slate-900 mt-3.5 mb-1.5;
+}
+
+.chat-markdown h3 {
+  @apply text-xs sm:text-sm font-semibold text-slate-800 mt-3 mb-1;
+}
+
+.chat-markdown p {
+  @apply my-2 leading-relaxed;
+}
+
+.chat-markdown p:first-child {
+  @apply mt-0;
+}
+
+.chat-markdown p:last-child {
+  @apply mb-0;
+}
+
+.chat-markdown strong {
+  @apply font-semibold text-slate-900;
+}
+
+.chat-markdown em {
+  @apply italic;
+}
+
+.chat-markdown ul {
+  @apply list-disc list-outside pl-5 my-2 space-y-1;
+}
+
+.chat-markdown ol {
+  @apply list-decimal list-outside pl-5 my-2 space-y-1;
+}
+
+.chat-markdown li {
+  @apply leading-relaxed;
+}
+
+.chat-markdown blockquote {
+  @apply border-l-4 border-indigo-400 pl-3.5 my-2.5 italic text-slate-600 bg-slate-50/80 py-1.5 rounded-r;
+}
+
+.chat-markdown hr {
+  @apply my-4 border-slate-200;
+}
+
+.chat-markdown a {
+  @apply text-indigo-600 hover:text-indigo-800 underline font-medium;
+}
+
+.chat-markdown code:not(pre code) {
+  @apply bg-slate-100 text-pink-600 px-1.5 py-0.5 rounded font-mono text-xs border border-slate-200 font-normal;
+}
+
+.chat-markdown pre {
+  @apply bg-slate-900 text-slate-100 p-3 rounded-lg my-2 font-mono text-xs overflow-x-auto shadow-inner;
+}
+
+.chat-markdown table {
+  @apply w-full text-xs border-collapse;
+}
+
+.chat-markdown th {
+  @apply bg-slate-100/90 text-slate-900 font-semibold px-3 py-2 text-left border-b border-slate-200 whitespace-nowrap;
+}
+
+.chat-markdown td {
+  @apply px-3 py-2.5 text-slate-700 border-b border-slate-100 align-top leading-relaxed;
+}
+
+.chat-markdown tbody tr:nth-child(even) {
+  @apply bg-slate-50/50;
+}
+
+.chat-markdown tbody tr:hover {
+  @apply bg-slate-100/60;
+}
+

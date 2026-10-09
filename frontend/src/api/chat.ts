@@ -13,6 +13,9 @@ export const chatApi = {
     });
     return r.data;
   },
+  async deleteConversation(id: string): Promise<void> {
+    await apiClient.delete(`/api/v1/chat/conversations/${id}`);
+  },
   async getHistory(id: string): Promise<ChatHistory> {
     const r = await apiClient.get<ChatHistory>(`/api/v1/chat/conversations/${id}/messages`);
     return r.data;

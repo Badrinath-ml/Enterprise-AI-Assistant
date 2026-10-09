@@ -3,6 +3,7 @@ package com.enterprise.knowledge.chat;
 import com.enterprise.knowledge.chat.dto.*;
 import com.enterprise.knowledge.common.tenant.TenantContext;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -35,6 +36,12 @@ public class ChatController {
         return chat.create(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), title);
     }
 
+    @DeleteMapping("/conversations/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        chat.delete(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id);
+    }
+
     @GetMapping("/conversations/{id}/messages")
     public ChatHistoryResponse history(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return chat.history(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id);
@@ -46,7 +53,6 @@ public class ChatController {
                                   @AuthenticationPrincipal Jwt jwt) {
         return chat.send(TenantContext.getRequired(), UUID.fromString(jwt.getSubject()), id, message);
     }
-
 
     @PostMapping(value = "/conversations/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable UUID id,

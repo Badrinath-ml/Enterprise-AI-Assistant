@@ -1,16 +1,17 @@
 # Enterprise Knowledge Assistant — Backend
 
-Production-ready backend for the Enterprise AI Assistant, implementing multi-tenant RBAC, memory-bounded document ingestion, vector retrieval with pgvector, and grounded RAG streaming with Google Gemini.
+Production-ready backend for the Enterprise AI Assistant, implementing multi-tenant RBAC, memory-bounded document ingestion, hybrid vector + BM25 retrieval with cross-encoder reranking, intent-aware routing, Grok generation with streaming SSE, and isolated private chat attachments.
 
 ## Technology Stack
 
 - **Java 21**
 - **Spring Boot 4.1.1**
-- **Spring AI 2.0.1** (Gemini embeddings & chat)
-- **PostgreSQL 17 + pgvector** (HNSW vector index)
+- **xAI Grok API** (`grok-2-latest` incremental streaming generation with resilient retries)
+- **Sentence Transformers** (`all-mpnet-base-v2`, 768 dimensions) & **Cross-Encoder Reranker** (`cross-encoder/ms-marco-MiniLM-L-6-v2`)
+- **PostgreSQL 17 / 18 + pgvector** (HNSW vector index + Postgres English FTS index)
 - **Spring Security + JWT**
 - **Spring Data JPA & Criteria Specifications**
-- **Flyway** (Migrations V1 through V8)
+- **Flyway** (Migrations V1 through V9)
 - **Apache PDFBox & Apache POI** (Memory-bounded document extraction)
 
 ## Architecture
@@ -31,11 +32,32 @@ Spring Security & JWT Filter ──► TenantContext & UserPrincipal
       ├─► DocumentIngestionService
       │     ├─► DocumentTextExtractorService (PDF, DOCX, TXT)
       │     ├─► TextChunker (Sentence & paragraph structure aware)
-      │     └─► GeminiEmbeddingService (Bounded exponential backoff)
+      │     └─► SentenceTransformersEmbeddingService (all-mpnet-base-v2, 768 dim)
       └─► ChatService (`/api/v1/chat`)
-            ├─► ChatRetrievalService (Pgvector cosine distance retrieval)
-            └─► Gemini Streaming via SSE (`citation`, `token`, `done`, `error`)
+            ├─► IntentRoutingService (GREETING, IDENTITY, GENERAL, ENTERPRISE, MIXED)
+            ├─► ChatRetrievalService (Hybrid: Dense Pgvector + Postgres BM25 FTS + RRF + Cross-Encoder Rerank)
+            ├─► GrokGenerationService (xAI Grok incremental SSE streaming)
+            ├─► Private Chat Attachments (Isolated employee attachments)
+            └─► Conversation Deletion (Cascades private attachments & messages)
 ```
+
+## Hybrid Retrieval Pipeline
+
+1. **Intent-Aware Routing**:
+   - Queries classified as `GREETING`, `IDENTITY`, or `GENERAL` are answered directly without running document retrieval, preventing spurious document citations (e.g., greetings retrieving NIST security standards).
+   - Queries classified as `ENTERPRISE` or `MIXED` trigger the hybrid retrieval pipeline.
+2. **Dense Vector Search**:
+   - Computes query embedding via `all-mpnet-base-v2` (768 dimensions).
+   - Retrieves top matching candidates via pgvector cosine distance (`<=> ?::vector`), strictly scoped by tenant and user department.
+3. **Sparse BM25 Keyword Search**:
+   - Uses PostgreSQL Full-Text Search (`to_tsvector('english', ...) @@ plainto_tsquery('english', ...)`).
+   - Accurately captures exact acronyms, codes, names, and policy identifiers.
+4. **Reciprocal Rank Fusion (RRF)**:
+   - Fuses dense and sparse rankings with standard smoothing constant $k = 60$:
+     $$RRF(d) = \frac{1}{60 + rank_{dense}(d)} + \frac{1}{60 + rank_{bm25}(d)}$$
+5. **Cross-Encoder Reranking**:
+   - Reranks top fused candidates using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+   - Filters out weak context below relevance threshold before constructing the bounded context prompt.
 
 ## Configuration & Environment Variables
 
@@ -45,7 +67,10 @@ Spring Security & JWT Filter ──► TenantContext & UserPrincipal
 | `SPRING_DATASOURCE_USERNAME` | `postgres` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | `postgres` | Database password |
 | `JWT_SECRET` | *(Development secret)* | Base64-encoded JWT signing secret (min 256 bits) |
-| `SPRING_AI_GEMINI_API_KEY` | *(None)* | Google Gemini API Key |
+| `GROK_API_KEY` | *(None)* | xAI Grok API Key |
+| `GROK_API_URL` | `https://api.x.ai/v1` | xAI Grok API Base URL |
+| `GROK_MODEL` | `grok-2-latest` | Grok model name |
+| `APP_AI_EMBEDDING_SERVICE_URL` | `http://127.0.0.1:8001` | Local Sentence Transformers embedding sidecar URL |
 | `APP_CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Comma-separated allowed CORS origins |
 | `DOCUMENT_STORAGE_PATH` | `storage/documents` | Storage folder for binary document files |
 | `APP_INGESTION_CHUNK_SIZE` | `1000` | Target token limit per chunk |
@@ -83,8 +108,13 @@ Spring Security & JWT Filter ──► TenantContext & UserPrincipal
 - `POST /api/v1/documents/{id}/retry-ingestion` — Retry indexing failed document
 
 ### Chat & Grounded RAG
-- `POST /api/v1/chat/stream` — SSE endpoint for grounded chat interactions
-- `POST /api/v1/chat/attachment` — Upload temporary attachment directly in chat
+- `GET /api/v1/chat/conversations` — List current user's conversations
+- `POST /api/v1/chat/conversations` — Create a new conversation
+- `DELETE /api/v1/chat/conversations/{id}` — Delete conversation and cascades private attachments
+- `GET /api/v1/chat/conversations/{id}/messages` — Conversation message history
+- `POST /api/v1/chat/conversations/{id}/stream` — SSE endpoint for grounded chat interactions
+- `POST /api/v1/chat/conversations/{id}/upload` — Isolated private attachment upload (Employee accessible, <=25MB)
+- `GET /api/v1/chat/sources/{documentId}` — Source document preview
 
 ## Automated Testing
 

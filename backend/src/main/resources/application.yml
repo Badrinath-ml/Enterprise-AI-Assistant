@@ -14,7 +14,6 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
     properties:
       hibernate:
@@ -51,20 +50,38 @@ app:
     chunk-size: ${INGESTION_CHUNK_SIZE:1200}
     chunk-overlap: ${INGESTION_CHUNK_OVERLAP:200}
   ai:
-    gemini:
-      api-key: ${GEMINI_API_KEY:}
+    grok:
+      api-key: ${GROK_API_KEY:${XAI_API_KEY:}}
+      base-url: ${GROK_BASE_URL:https://api.x.ai/v1}
+      model: ${GROK_MODEL:grok-2-latest}
+      timeout-seconds: ${GROK_TIMEOUT_SECONDS:60}
+      max-tokens: ${GROK_MAX_TOKENS:4096}
+      temperature: ${GROK_TEMPERATURE:0.2}
+      max-retries: ${GROK_MAX_RETRIES:3}
+    google:
+      api-key: ${GOOGLE_API_KEY:}
+      embedding-model: ${EMBEDDING_MODEL:google-embedding-2}
     huggingface:
       token: ${HF_TOKEN:}
+      generation-model: ${HF_GENERATION_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}
     embedding:
-      model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-2}
-      dimensions: ${GEMINI_EMBEDDING_DIMENSIONS:768}
+      service-url: ${EMBEDDING_SERVICE_URL:http://127.0.0.1:8001}
+      model: ${EMBEDDING_MODEL:all-mpnet-base-v2}
+      dimensions: ${EMBEDDING_DIMENSIONS:768}
+      timeout-seconds: ${EMBEDDING_TIMEOUT_SECONDS:30}
+      batch-size: ${EMBEDDING_BATCH_SIZE:32}
+      max-retries: ${EMBEDDING_MAX_RETRIES:3}
+    reranker:
+      model: ${RERANKER_MODEL:cross-encoder/ms-marco-MiniLM-L-6-v2}
+      minimum-score: ${RERANKER_MINIMUM_SCORE:-4.0}
     retrieval:
-      minimum-similarity: 0.20
-    generation:
-      gemini-model: ${GEMINI_GENERATION_MODEL:gemini-3.8-flash}
-      huggingface-model: ${HF_GENERATION_MODEL:Qwen/Qwen3-30B-A3B-Instruct-2507}
+      minimum-similarity: ${RETRIEVAL_MINIMUM_SIMILARITY:0.40}
+      dense-candidates: ${RETRIEVAL_DENSE_CANDIDATES:15}
+      sparse-candidates: ${RETRIEVAL_SPARSE_CANDIDATES:15}
+      fusion-candidates: ${RETRIEVAL_FUSION_CANDIDATES:12}
+      top-k: ${RETRIEVAL_TOP_K:5}
+      max-context-tokens: ${RETRIEVAL_MAX_CONTEXT_TOKENS:3500}
   security:
     jwt:
-      # Replace this in any real deployment with a strong secret of >= 32 bytes.
       secret: ${JWT_SECRET:change-this-development-secret-key-please}
       expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}

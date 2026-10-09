@@ -17,17 +17,20 @@ public class ChatPersistenceService {
     private final ChatCitationRepository citations;
     private final UserService userService;
     private final DocumentService documentService;
+    private final ChatConversationAttachmentRepository attachmentRepository;
 
     public ChatPersistenceService(ChatConversationRepository conversations,
                                   ChatMessageRepository messages,
                                   ChatCitationRepository citations,
                                   UserService userService,
-                                  DocumentService documentService) {
+                                  DocumentService documentService,
+                                  ChatConversationAttachmentRepository attachmentRepository) {
         this.conversations = conversations;
         this.messages = messages;
         this.citations = citations;
         this.userService = userService;
         this.documentService = documentService;
+        this.attachmentRepository = attachmentRepository;
     }
 
     @Transactional
@@ -54,17 +57,24 @@ public class ChatPersistenceService {
         messages.save(assistant);
 
         for (ChatRetrievalService.RetrievedChunk chunk : chunks) {
-            Document document = documentService.getEntity(tenantId, userId, chunk.documentId());
-            citations.save(new ChatCitation(
-                    UUID.randomUUID(), assistant, document,
-                    chunk.documentVersion(), chunk.chunkId(), chunk.chunkIndex(),
-                    chunk.similarity(), chunk.content(), chunk.pageNumber(), chunk.locatorLabel()));
+            if (chunk.isPrivateAttachment()) {
+                ChatConversationAttachment attachment = attachmentRepository.findById(chunk.documentId()).orElse(null);
+                citations.save(new ChatCitation(
+                        UUID.randomUUID(), assistant, null, attachment,
+                        chunk.documentVersion(), chunk.chunkId(), chunk.chunkIndex(),
+                        chunk.similarity(), chunk.content(), chunk.pageNumber(), chunk.locatorLabel()));
+            } else {
+                Document document = documentService.getEntity(tenantId, userId, chunk.documentId());
+                citations.save(new ChatCitation(
+                        UUID.randomUUID(), assistant, document, null,
+                        chunk.documentVersion(), chunk.chunkId(), chunk.chunkIndex(),
+                        chunk.similarity(), chunk.content(), chunk.pageNumber(), chunk.locatorLabel()));
+            }
         }
 
         conversation.touchNow();
         if ("New conversation".equals(conversation.getTitle())) {
             String title = text.length() > 60 ? text.substring(0, 60) : text;
-            // Keep the original question as the title when the caller supplies it separately.
             conversation.setTitle(title);
         }
         conversations.save(conversation);

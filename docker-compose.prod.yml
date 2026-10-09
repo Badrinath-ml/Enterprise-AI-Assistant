@@ -32,7 +32,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-knowledge_secret_password}
       JWT_SECRET: ${JWT_SECRET:-please_set_a_strong_production_secret_32_bytes_min}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-google-embedding-2}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-768}
+      GROK_API_KEY: ${GROK_API_KEY:-}
+      GROK_MODEL: ${GROK_MODEL:-grok-2-latest}
+      GROK_BASE_URL: ${GROK_BASE_URL:-https://api.x.ai/v1}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_GENERATION_MODEL: ${HF_GENERATION_MODEL:-Qwen/Qwen3-30B-A3B-Instruct-2507}
       DOCUMENT_STORAGE_PATH: /app/storage/documents
     ports:
       - "8080:8080"
