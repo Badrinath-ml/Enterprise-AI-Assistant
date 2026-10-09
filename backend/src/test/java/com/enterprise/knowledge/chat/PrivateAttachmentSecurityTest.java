@@ -53,8 +53,8 @@ class PrivateAttachmentSecurityTest {
     void setUp() {
         chatService = new ChatService(
                 conversations, null, null, attachmentRepository, null, null, null,
-                null, userService, null, documentService, extractor, chunker, embeddingService,
-                storage, null, null, null
+                null, userService, null, documentService, extractor, storage, mock(ChatAttachmentIngestionService.class),
+                null, null, null
         );
     }
 
