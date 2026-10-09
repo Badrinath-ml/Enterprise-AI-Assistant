@@ -44,7 +44,7 @@ public class ChatAttachmentIngestionService {
         this.jdbc = jdbc;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void index(UUID tenantId, UUID conversationId, UUID attachmentId, String storageKey,
                       String fileName, String mimeType) throws Exception {
         ChatConversationAttachment attachment = attachments.findByIdAndConversationId(attachmentId, conversationId)
