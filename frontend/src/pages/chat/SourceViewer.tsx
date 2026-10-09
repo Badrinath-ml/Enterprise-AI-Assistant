@@ -57,8 +57,8 @@ export const SourceViewer: React.FC<Props> = ({
     if (matchIndex < 0) {
       const sentences = cleanSnippet
         .split(/[.\n;]+/)
-        .map(s => s.trim())
-        .filter(s => s.length >= 25);
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 25);
 
       for (const sentence of sentences) {
         const idx = lowerDoc.indexOf(sentence.toLowerCase());
@@ -73,7 +73,6 @@ export const SourceViewer: React.FC<Props> = ({
     // 3. Fallback: match normalized whitespace
     if (matchIndex < 0) {
       const normalizedNeedle = cleanSnippet.replace(/\s+/g, ' ');
-      // Try chunks of 30 characters
       const sample = normalizedNeedle.slice(0, 40);
       const idx = lowerDoc.indexOf(sample.toLowerCase());
       if (idx >= 0) {
@@ -94,7 +93,6 @@ export const SourceViewer: React.FC<Props> = ({
     return { before: docText, match: '', after: '', found: false };
   }, [citation, source]);
 
-  // Scroll highlight into view whenever citation or match changes
   useEffect(() => {
     if (highlightResult.found) {
       const timer = setTimeout(() => {
@@ -116,10 +114,15 @@ export const SourceViewer: React.FC<Props> = ({
 
   if (!citation || !source) return null;
 
-  const isPdf = source.mimeType === 'application/pdf' || source.fileName.toLowerCase().endsWith('.pdf');
+  const isPdf =
+    source.mimeType === 'application/pdf' ||
+    source.fileName.toLowerCase().endsWith('.pdf');
 
-  // Find index of current citation in allCitations
-  const currentIndex = allCitations.findIndex(c => c.id === citation.id || (c.documentId === citation.documentId && c.chunkId === citation.chunkId));
+  const currentIndex = allCitations.findIndex(
+    (c) =>
+      c.id === citation.id ||
+      (c.documentId === citation.documentId && c.chunkId === citation.chunkId)
+  );
   const hasMultiple = allCitations.length > 1;
 
   return (
@@ -131,31 +134,36 @@ export const SourceViewer: React.FC<Props> = ({
       size="xl"
     >
       <div className="flex flex-col h-[70vh] -mt-2">
-        {/* Document header / citation navigation toolbar */}
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl mb-3 flex flex-wrap items-center justify-between gap-2.5">
+        {/* Document toolbar */}
+        <div className="p-3 bg-slate-50 dark:bg-[#0c121e] border border-slate-200 dark:border-[#1f2d44] rounded-xl mb-3 flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 shadow-2xs">
-              {isPdf ? <FileType2 className="w-4 h-4 text-rose-500" /> : <FileText className="w-4 h-4 text-blue-500" />}
+            <div className="p-1.5 rounded-lg bg-white dark:bg-[#182338] border border-slate-200 dark:border-[#22314a] text-slate-700 dark:text-slate-300 shadow-2xs">
+              {isPdf ? (
+                <FileType2 className="w-4 h-4 text-rose-500" />
+              ) : (
+                <FileText className="w-4 h-4 text-indigo-500" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-900">{source.fileName}</span>
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {source.fileName}
+                </span>
                 {citation.pageNumber && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full">
                     <Hash className="w-2.5 h-2.5" /> Page {citation.pageNumber}
                   </span>
                 )}
-                <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 px-2 py-0.5 rounded-full">
                   {Math.round(citation.confidence * 100)}% Match
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Citation navigation buttons (if multiple citations available) */}
           {hasMultiple && onSelectCitation && (
             <div className="flex items-center gap-1.5 ml-auto">
-              <span className="text-[11px] text-slate-500 font-medium mr-1">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mr-1">
                 Citation {currentIndex >= 0 ? currentIndex + 1 : 1} of {allCitations.length}
               </span>
               <button
@@ -164,7 +172,7 @@ export const SourceViewer: React.FC<Props> = ({
                 onClick={() => {
                   if (currentIndex > 0) onSelectCitation(allCitations[currentIndex - 1]);
                 }}
-                className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-600 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#1f2d44] bg-white dark:bg-[#182338] hover:bg-slate-100 dark:hover:bg-[#202f4a] disabled:opacity-40 text-slate-600 dark:text-slate-400 cursor-pointer"
                 title="Previous citation"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -173,9 +181,10 @@ export const SourceViewer: React.FC<Props> = ({
                 type="button"
                 disabled={currentIndex < 0 || currentIndex >= allCitations.length - 1}
                 onClick={() => {
-                  if (currentIndex < allCitations.length - 1) onSelectCitation(allCitations[currentIndex + 1]);
+                  if (currentIndex < allCitations.length - 1)
+                    onSelectCitation(allCitations[currentIndex + 1]);
                 }}
-                className="p-1 rounded-md border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-600 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#1f2d44] bg-white dark:bg-[#182338] hover:bg-slate-100 dark:hover:bg-[#202f4a] disabled:opacity-40 text-slate-600 dark:text-slate-400 cursor-pointer"
                 title="Next citation"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -184,14 +193,14 @@ export const SourceViewer: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Retrieved answer snippet preview banner */}
-        <div className="mb-3 px-3.5 py-2.5 rounded-lg border border-amber-200/80 bg-amber-50/70 flex items-start justify-between gap-3 shadow-2xs">
+        {/* Retrieved snippet banner */}
+        <div className="mb-3 px-3.5 py-2.5 rounded-xl border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 flex items-start justify-between gap-3 shadow-2xs">
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900 mb-1">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              Retrieved Answer Point
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900 dark:text-amber-300 mb-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              Retrieved Evidence Point
             </div>
-            <p className="text-xs text-amber-950 font-sans leading-relaxed line-clamp-2">
+            <p className="text-xs text-amber-950 dark:text-amber-200 font-sans leading-relaxed line-clamp-2">
               "{citation.snippet}"
             </p>
           </div>
@@ -199,10 +208,10 @@ export const SourceViewer: React.FC<Props> = ({
             <button
               type="button"
               onClick={scrollToHighlight}
-              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-200/70 hover:bg-amber-200 px-2.5 py-1 rounded-md border border-amber-300 transition-colors"
+              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-200/70 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-900 px-2.5 py-1 rounded-lg border border-amber-300 dark:border-amber-800 transition-colors cursor-pointer"
             >
               <Target className="w-3 h-3" />
-              Jump to Answer
+              Jump to Highlight
             </button>
           )}
         </div>
@@ -210,14 +219,14 @@ export const SourceViewer: React.FC<Props> = ({
         {/* Document content viewer with highlighted passage */}
         <div
           ref={contentRef}
-          className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 text-sm font-sans leading-7 text-slate-800 shadow-2xs relative"
+          className="flex-1 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#1f1f1f] bg-white dark:bg-[#000000] p-5 text-sm font-sans leading-7 text-slate-800 dark:text-slate-200 shadow-2xs relative"
         >
           {highlightResult.found ? (
             <div className="whitespace-pre-wrap">
               {highlightResult.before}
               <mark
                 id="active-source-highlight"
-                className="bg-amber-200/90 text-slate-950 px-1 py-0.5 rounded font-semibold border-b-2 border-amber-500 shadow-xs ring-2 ring-amber-300/60"
+                className="bg-amber-300 dark:bg-amber-500/30 text-slate-950 dark:text-amber-100 px-1 py-0.5 rounded font-semibold border-b-2 border-amber-500 shadow-xs ring-2 ring-amber-400/40"
               >
                 {highlightResult.match}
               </mark>
@@ -225,8 +234,8 @@ export const SourceViewer: React.FC<Props> = ({
             </div>
           ) : (
             <div>
-              <div className="mb-4 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-                <span>The extracted snippet was normalized during ingestion. Full document text is displayed below.</span>
+              <div className="mb-4 p-2.5 rounded-lg bg-slate-50 dark:bg-[#0a0a0a] border border-slate-200 dark:border-[#1f1f1f] text-xs text-slate-600 dark:text-slate-400">
+                <span>Normalized document text rendered below:</span>
               </div>
               <div className="whitespace-pre-wrap">{source.text}</div>
             </div>

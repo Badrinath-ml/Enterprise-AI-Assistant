@@ -9,9 +9,9 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-800" />
-        <span className="text-xs text-slate-500 font-medium">Verifying session...</span>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-black text-slate-800 dark:text-slate-200 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Verifying session...</span>
       </div>
     );
   }

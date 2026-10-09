@@ -64,14 +64,16 @@ export const LoginPage: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-slate-900">Sign in to your account</h3>
-        <p className="text-xs text-slate-500 mt-1">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Sign in to your account
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Enter your organization details and credentials to continue.
         </p>
       </div>
 
       {formError && (
-        <div className="mb-5 p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-700">
+        <div className="mb-5 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
           {formError}
         </div>
       )}
@@ -116,9 +118,9 @@ export const LoginPage: React.FC = () => {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded text-slate-900 border-slate-300 focus:ring-slate-800"
+              className="w-4 h-4 rounded text-indigo-600 border-slate-300 dark:border-slate-700 bg-white dark:bg-[#111827] focus:ring-indigo-500"
             />
-            <span className="text-xs text-slate-600">Remember this session</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">Remember this session</span>
           </label>
         </div>
 
@@ -133,12 +135,12 @@ export const LoginPage: React.FC = () => {
         </Button>
       </form>
 
-      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-        <p className="text-xs text-slate-500">
+      <div className="mt-6 pt-5 border-t border-slate-100 dark:border-[#1f2d44] text-center">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Need to create a new organization?{' '}
           <Link
             to="/register"
-            className="font-semibold text-slate-900 hover:underline inline-flex items-center gap-1"
+            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
           >
             Create organization
           </Link>

@@ -1,7 +1,181 @@
-import React,{useEffect,useState}from'react';import{Modal}from'../../components/common/Modal';import{Input}from'../../components/common/Input';import{Select}from'../../components/common/Select';import{Button}from'../../components/common/Button';import{userApi}from'../../api/users';import{departmentApi}from'../../api/departments';import{DepartmentResponse}from'../../types/department';import{UpdateUserRequest,UserResponse}from'../../types/user';import{UserRole}from'../../types/auth';import{useAuth}from'../../hooks/useAuth';import{useToast}from'../../hooks/useToast';import{ApiError}from'../../types/api';
-interface Props{isOpen:boolean;user:UserResponse|null;onClose:()=>void;onUpdated:(user:UserResponse)=>void;}
-export const EditUserModal:React.FC<Props>=({isOpen,user,onClose,onUpdated})=>{const{user:currentUser}=useAuth();const{success,error:toastError}=useToast();const isManager=currentUser?.role==='MANAGER';const[firstName,setFirstName]=useState('');const[lastName,setLastName]=useState('');const[email,setEmail]=useState('');const[role,setRole]=useState<UserRole>('EMPLOYEE');const[departmentId,setDepartmentId]=useState('');const[active,setActive]=useState(true);const[departments,setDepartments]=useState<DepartmentResponse[]>([]);const[loading,setLoading]=useState(false);const[error,setError]=useState<string|null>(null);
-useEffect(()=>{if(!isOpen||!user)return;const p=user.name.trim().split(/\s+/);setFirstName(p.shift()||'');setLastName(p.join(' '));setEmail(user.email);setRole(user.role);setDepartmentId(user.departmentId||'');setActive(user.active);setError(null);departmentApi.getDepartments().then(setDepartments).catch(()=>{});},[isOpen,user]);
-const submit=async(e:React.FormEvent)=>{e.preventDefault();if(!user)return;const name=(firstName.trim()+' '+lastName.trim()).trim();if(!name)return setError('First and last name are required');if(!email.trim())return setError('Email address is required');if(!isManager&&role==='MANAGER'&&!departmentId)return setError('A manager must be assigned to a department');const payload:UpdateUserRequest={name,email:email.trim().toLowerCase(),departmentId:departmentId||null,role:isManager?'EMPLOYEE':role,active};setLoading(true);setError(null);try{const updated=await userApi.updateUser(user.id,payload);success(updated.name+' was updated successfully.','Member Updated');onUpdated(updated);onClose();}catch(err){const e=err as ApiError;const msg=e.message||'Failed to update member.';setError(msg);toastError(msg,'Could not update member');}finally{setLoading(false);}};
-const roles=isManager?[{value:'EMPLOYEE',label:'Employee'}]:[{value:'EMPLOYEE',label:'Employee'},{value:'MANAGER',label:'Manager'},{value:'ADMIN',label:'Admin'}];const depts=isManager?departments.filter(d=>d.id===currentUser?.departmentId).map(d=>({value:d.id,label:d.name})):[{value:'',label:'No department'},...departments.map(d=>({value:d.id,label:d.name}))];
-return <Modal isOpen={isOpen} onClose={onClose} title="Edit Member" description={isManager?'Update an employee in your department.':'Update this member of your organization.'} footer={<><Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>Cancel</Button><Button variant="primary" size="sm" onClick={submit} isLoading={loading}>Save Changes</Button></>}><form onSubmit={submit} className="space-y-4">{error&&<div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-700">{error}</div>}<div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input label="First Name" value={firstName} onChange={e=>setFirstName(e.target.value)} required autoFocus/><Input label="Last Name" value={lastName} onChange={e=>setLastName(e.target.value)} required/></div><Input label="Email Address" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Select label="Role" value={isManager?'EMPLOYEE':role} onChange={e=>setRole(e.target.value as UserRole)} options={roles} disabled={isManager} required/><Select label="Department" value={departmentId} onChange={e=>setDepartmentId(e.target.value)} options={depts} disabled={isManager}/></div><Select label="Account Status" value={active?'ACTIVE':'INACTIVE'} onChange={e=>setActive(e.target.value==='ACTIVE')} options={[{value:'ACTIVE',label:'Active'},{value:'INACTIVE',label:'Inactive'}]}/></form></Modal>;};
+import React, { useEffect, useState } from 'react';
+import { Modal } from '../../components/common/Modal';
+import { Input } from '../../components/common/Input';
+import { Select } from '../../components/common/Select';
+import { Button } from '../../components/common/Button';
+import { userApi } from '../../api/users';
+import { departmentApi } from '../../api/departments';
+import { DepartmentResponse } from '../../types/department';
+import { UpdateUserRequest, UserResponse } from '../../types/user';
+import { UserRole } from '../../types/auth';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
+import { ApiError } from '../../types/api';
+import { dataSync } from '../../utils/dataSync';
+
+interface Props {
+  isOpen: boolean;
+  user: UserResponse | null;
+  onClose: () => void;
+  onUpdated: (user: UserResponse) => void;
+}
+
+export const EditUserModal: React.FC<Props> = ({ isOpen, user, onClose, onUpdated }) => {
+  const { user: currentUser } = useAuth();
+  const { success, error: toastError } = useToast();
+  const isManager = currentUser?.role === 'MANAGER';
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<UserRole>('EMPLOYEE');
+  const [departmentId, setDepartmentId] = useState('');
+  const [active, setActive] = useState(true);
+  const [departments, setDepartments] = useState<DepartmentResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !user) return;
+    const parts = user.name.trim().split(/\s+/);
+    setFirstName(parts.shift() || '');
+    setLastName(parts.join(' '));
+    setEmail(user.email);
+    setRole(user.role);
+    setDepartmentId(user.departmentId || '');
+    setActive(user.active);
+    setError(null);
+    departmentApi.getDepartments().then(setDepartments).catch(() => {});
+  }, [isOpen, user]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    const name = (firstName.trim() + ' ' + lastName.trim()).trim();
+    if (!name) return setError('First and last name are required');
+    if (!email.trim()) return setError('Email address is required');
+    if (!isManager && role === 'MANAGER' && !departmentId) {
+      return setError('A manager must be assigned to a department');
+    }
+
+    const payload: UpdateUserRequest = {
+      name,
+      email: email.trim().toLowerCase(),
+      departmentId: departmentId || null,
+      role: isManager ? 'EMPLOYEE' : role,
+      active,
+    };
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await userApi.updateUser(user.id, payload);
+      success(`${updated.name} was updated successfully.`, 'Member Updated');
+      dataSync.notify('users');
+      onUpdated(updated);
+      onClose();
+    } catch (err) {
+      const e = err as ApiError;
+      const msg = e.message || 'Failed to update member.';
+      setError(msg);
+      toastError(msg, 'Could not update member');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const roles = isManager
+    ? [{ value: 'EMPLOYEE', label: 'Employee' }]
+    : [
+        { value: 'EMPLOYEE', label: 'Employee' },
+        { value: 'MANAGER', label: 'Manager' },
+        { value: 'ADMIN', label: 'Admin' },
+      ];
+
+  const depts = isManager
+    ? departments
+        .filter((d) => d.id === currentUser?.departmentId)
+        .map((d) => ({ value: d.id, label: d.name }))
+    : [
+        { value: '', label: 'No department' },
+        ...departments.map((d) => ({ value: d.id, label: d.name })),
+      ];
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Member"
+      description={
+        isManager
+          ? 'Update employee details in your department.'
+          : 'Update profile and roles for this organization member.'
+      }
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={submit} isLoading={loading}>
+            Save Changes
+          </Button>
+        </>
+      }
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {error && (
+          <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
+            {error}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="First Name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            autoFocus
+          />
+          <Input
+            label="Last Name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+          />
+        </div>
+        <Input
+          label="Email Address"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select
+            label="Role"
+            value={isManager ? 'EMPLOYEE' : role}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+            options={roles}
+            disabled={isManager}
+            required
+          />
+          <Select
+            label="Department"
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+            options={depts}
+            disabled={isManager}
+          />
+        </div>
+        <Select
+          label="Account Status"
+          value={active ? 'ACTIVE' : 'INACTIVE'}
+          onChange={(e) => setActive(e.target.value === 'ACTIVE')}
+          options={[
+            { value: 'ACTIVE', label: 'Active' },
+            { value: 'INACTIVE', label: 'Inactive' },
+          ]}
+        />
+      </form>
+    </Modal>
+  );
+};

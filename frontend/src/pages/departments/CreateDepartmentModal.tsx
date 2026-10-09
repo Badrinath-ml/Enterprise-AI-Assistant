@@ -6,6 +6,7 @@ import { departmentApi } from '../../api/departments';
 import { DepartmentResponse } from '../../types/department';
 import { useToast } from '../../hooks/useToast';
 import { ApiError } from '../../types/api';
+import { dataSync } from '../../utils/dataSync';
 
 interface CreateDepartmentModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
     try {
       const created = await departmentApi.createDepartment({ name: name.trim() });
       success(`Department "${created.name}" created successfully.`, 'Department Created');
+      dataSync.notify('departments');
       onCreated(created);
       setName('');
       onClose();
@@ -53,7 +55,7 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Create New Department"
-      description="Add a department to organize people in your organization."
+      description="Add a department to organize people and document access in your organization."
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isLoading}>
@@ -73,13 +75,13 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-700">
+          <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
             {error}
           </div>
         )}
         <Input
           label="Department Name"
-          placeholder="e.g. Engineering, Sales, Human Resources"
+          placeholder="e.g. Engineering, Product, Human Resources"
           value={name}
           onChange={(e) => {
             setName(e.target.value);

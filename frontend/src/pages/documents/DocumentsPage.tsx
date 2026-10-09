@@ -1,5 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, FileText, MoreHorizontal, Pencil, RefreshCw, Search, Trash2, Eye, FileUp, Replace } from 'lucide-react';
+import {
+  Download,
+  FileText,
+  MoreHorizontal,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash2,
+  Eye,
+  FileUp,
+  Replace,
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { documentApi } from '../../api/documents';
 import { departmentApi } from '../../api/departments';
@@ -18,6 +29,7 @@ import { EditDocumentModal } from './EditDocumentModal';
 import { ReplaceDocumentModal } from './ReplaceDocumentModal';
 import { useToast } from '../../hooks/useToast';
 import { formatDate } from '../../utils/formatters';
+import { dataSync, useDataSync } from '../../utils/dataSync';
 
 const statusOptions = [
   { value: '', label: 'All Statuses' },
@@ -52,6 +64,7 @@ export const DocumentsPage: React.FC = () => {
   const [deleting, setDeleting] = useState<DocumentResponse | null>(null);
   const [preview, setPreview] = useState<{ doc: DocumentResponse; url: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
   const isAdmin = user?.role === 'ADMIN';
   const canManage = isAdmin || user?.role === 'MANAGER';
 
@@ -71,23 +84,32 @@ export const DocumentsPage: React.FC = () => {
       setTotal(result.totalElements);
     } catch (e) {
       error((e as { message?: string }).message || 'Unable to load documents.', 'Could not load documents');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadDepartments = async () => {
-    if (!isAdmin) {
-      setDepartments([]);
-      return;
-    }
     try {
-      setDepartments(await departmentApi.getDepartments());
-    } catch (e) {
-      error((e as { message?: string }).message || 'Unable to load departments.', 'Could not load departments');
+      const depts = await departmentApi.getDepartments();
+      setDepartments(depts);
+    } catch {
+      // Non-critical department list failure
     }
   };
 
-  useEffect(() => { load(0); }, [q, status, departmentId, isAdmin, user?.departmentId]);
-  useEffect(() => { loadDepartments(); }, [isAdmin]);
+  useEffect(() => {
+    load(0);
+  }, [q, status, departmentId, isAdmin, user?.departmentId]);
+
+  useEffect(() => {
+    loadDepartments();
+  }, []);
+
+  // Sync if departments are added or deleted by Admin
+  useDataSync(['departments'], () => {
+    loadDepartments();
+  });
 
   const openPreview = async (doc: DocumentResponse) => {
     try {
@@ -126,38 +148,81 @@ export const DocumentsPage: React.FC = () => {
     try {
       await documentApi.deleteDocument(deleting.id);
       success(`"${deleting.title}" was deleted.`, 'Document Deleted');
+      dataSync.notify('documents');
       setDeleting(null);
       await load(page);
     } catch (e) {
       error((e as { message?: string }).message || 'Unable to delete document.', 'Delete Failed');
-    } finally { setActionLoading(false); }
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const filteredCountLabel = useMemo(() => total === 1 ? '1 document' : `${total} documents`, [total]);
+  const handleApprove = async (doc: DocumentResponse) => {
+    try {
+      await documentApi.approve(doc.id);
+      success(`"${doc.title}" is now approved and available to RAG.`, 'Document Approved');
+      dataSync.notify('documents');
+      await load(page);
+    } catch (e) {
+      error((e as { message?: string }).message || 'Unable to approve document.', 'Approval Failed');
+    }
+  };
+
+  const retryIngestion = async (doc: DocumentResponse) => {
+    try {
+      await documentApi.retryIngestion(doc.id);
+      success(`Ingestion queued for "${doc.title}".`, 'Ingestion Queued');
+      dataSync.notify('documents');
+      await load(page);
+    } catch (e) {
+      error((e as { message?: string }).message || 'Unable to retry ingestion.', 'Retry Failed');
+    }
+  };
+
+  const filteredCountLabel = useMemo(
+    () => (total === 1 ? '1 document' : `${total} documents`),
+    [total]
+  );
 
   const statusBadge = (s: DocumentStatus) => {
     switch (s) {
-      case 'APPROVED': return <Badge variant="success">Approved</Badge>;
-      case 'PENDING_REVIEW': return <Badge variant="warning">Pending</Badge>;
-      case 'REJECTED': return <Badge variant="error">Rejected</Badge>;
-      case 'ARCHIVED': return <Badge variant="neutral">Archived</Badge>;
+      case 'APPROVED':
+        return <Badge variant="success">Approved</Badge>;
+      case 'PENDING_REVIEW':
+        return <Badge variant="warning">Pending</Badge>;
+      case 'REJECTED':
+        return <Badge variant="error">Rejected</Badge>;
+      case 'ARCHIVED':
+        return <Badge variant="neutral">Archived</Badge>;
       case 'DRAFT':
-      default: return <Badge variant="default">Draft</Badge>;
+      default:
+        return <Badge variant="default">Draft</Badge>;
     }
   };
 
   const ingestionBadge = (doc: DocumentResponse) => {
     switch (doc.ingestionStatus) {
       case 'INDEXED':
-        return <Badge variant="blue" className="normal-case">Indexed ({doc.indexedChunkCount} chunks)</Badge>;
+        return (
+          <Badge variant="blue" className="normal-case">
+            Indexed ({doc.indexedChunkCount} chunks)
+          </Badge>
+        );
       case 'PROCESSING':
-        return <Badge variant="warning" className="normal-case animate-pulse">Processing...</Badge>;
+        return (
+          <Badge variant="warning" className="normal-case animate-pulse">
+            Processing...
+          </Badge>
+        );
       case 'QUEUED':
         return <Badge variant="default" className="normal-case">Queued</Badge>;
       case 'FAILED':
         return (
           <span title={doc.ingestionError || 'Ingestion failed'}>
-            <Badge variant="error" className="normal-case cursor-help">Failed</Badge>
+            <Badge variant="error" className="normal-case cursor-help">
+              Failed
+            </Badge>
           </span>
         );
       case 'NOT_INDEXED':
@@ -166,67 +231,311 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
-  const retryIngestion = async (doc: DocumentResponse) => {
-    try {
-      await documentApi.retryIngestion(doc.id);
-      success(`Ingestion queued for "${doc.title}".`, 'Ingestion Queued');
-      await load(page);
-    } catch (e) {
-      error((e as { message?: string }).message || 'Unable to retry ingestion.', 'Retry Failed');
-    }
-  };
-
   const columns: Column<DocumentResponse>[] = [
-    { key: 'title', header: 'Document', render: d => <div className="flex items-center gap-2.5"><div className="p-1.5 rounded-md bg-slate-100 text-slate-600"><FileText className="w-4 h-4"/></div><div className="min-w-0"><div className="font-semibold text-slate-900 text-xs truncate max-w-[260px]">{d.title}</div><div className="text-[11px] text-slate-500 truncate max-w-[260px]">{d.originalFileName} · v{d.version}</div></div></div> },
-    { key: 'department', header: 'Department', render: d => <span className="text-xs text-slate-700">{d.departmentName || 'Organization-wide'}</span> },
-    { key: 'status', header: 'Status', render: d => statusBadge(d.status) },
-    { key: 'ingestion', header: 'AI Indexing', render: d => ingestionBadge(d) },
-    { key: 'size', header: 'Size', render: d => <span className="text-xs text-slate-500">{formatSize(d.fileSize)}</span> },
-    { key: 'updatedAt', header: 'Updated', render: d => <span className="text-xs text-slate-500">{formatDate(d.updatedAt)}</span> },
-    { key: 'actions', header: '', align: 'right', render: d => <Dropdown trigger={<button className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label={`Actions for ${d.title}`}><MoreHorizontal className="w-4 h-4"/></button>} items={[
-      { label: 'Preview', icon: <Eye className="w-4 h-4"/>, onClick: () => openPreview(d) },
-      { label: 'Download', icon: <Download className="w-4 h-4"/>, onClick: () => download(d) },
-      ...(canManage ? [
-        ...((d.status === 'DRAFT' || d.status === 'PENDING_REVIEW') ? [
-          { label: 'Approve', icon: <RefreshCw className="w-4 h-4"/>, onClick: async () => {
-            try {
-              await documentApi.approve(d.id);
-              success(`"${d.title}" is now approved and available to RAG.`, 'Document Approved');
-              await load(page);
-            } catch (e) {
-              error((e as { message?: string }).message || 'Unable to approve document.', 'Approval Failed');
-            }
-          } }
-        ] : []),
-        ...(d.ingestionStatus === 'FAILED' ? [
-          { label: 'Retry Indexing', icon: <RefreshCw className="w-4 h-4"/>, onClick: () => retryIngestion(d) }
-        ] : []),
-        { label: 'Edit details', icon: <Pencil className="w-4 h-4"/>, onClick: () => setEditing(d) },
-        { label: 'Replace file', icon: <Replace className="w-4 h-4"/>, onClick: () => setReplacing(d) },
-        { label: 'Delete', icon: <Trash2 className="w-4 h-4"/>, onClick: () => setDeleting(d), danger: true },
-      ] : []),
-    ]}/> },
+    {
+      key: 'title',
+      header: 'Document',
+      render: (d) => (
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-slate-100 dark:bg-[#182338] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#22314a] shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-900 dark:text-slate-100 text-xs truncate max-w-[280px]">
+              {d.title}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[280px]">
+              {d.originalFileName} · v{d.version}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'department',
+      header: 'Department',
+      render: (d) => (
+        <span className="text-xs text-slate-700 dark:text-slate-300">
+          {d.departmentName || 'Organization-wide'}
+        </span>
+      ),
+    },
+    { key: 'status', header: 'Status', render: (d) => statusBadge(d.status) },
+    { key: 'ingestion', header: 'AI Indexing', render: (d) => ingestionBadge(d) },
+    {
+      key: 'size',
+      header: 'Size',
+      render: (d) => (
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {formatSize(d.fileSize)}
+        </span>
+      ),
+    },
+    {
+      key: 'updatedAt',
+      header: 'Updated',
+      render: (d) => (
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {formatDate(d.updatedAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      render: (d) => (
+        <Dropdown
+          trigger={
+            <button
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#182338] transition-colors cursor-pointer"
+              aria-label={`Actions for ${d.title}`}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          }
+          items={[
+            {
+              label: 'Preview',
+              icon: <Eye className="w-4 h-4" />,
+              onClick: () => openPreview(d),
+            },
+            {
+              label: 'Download',
+              icon: <Download className="w-4 h-4" />,
+              onClick: () => download(d),
+            },
+            ...(canManage
+              ? [
+                  ...(d.status === 'DRAFT' || d.status === 'PENDING_REVIEW'
+                    ? [
+                        {
+                          label: 'Approve',
+                          icon: <RefreshCw className="w-4 h-4" />,
+                          onClick: () => handleApprove(d),
+                        },
+                      ]
+                    : []),
+                  ...(d.ingestionStatus === 'FAILED'
+                    ? [
+                        {
+                          label: 'Retry Indexing',
+                          icon: <RefreshCw className="w-4 h-4" />,
+                          onClick: () => retryIngestion(d),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: 'Edit details',
+                    icon: <Pencil className="w-4 h-4" />,
+                    onClick: () => setEditing(d),
+                  },
+                  {
+                    label: 'Replace file',
+                    icon: <Replace className="w-4 h-4" />,
+                    onClick: () => setReplacing(d),
+                  },
+                  {
+                    label: 'Delete',
+                    icon: <Trash2 className="w-4 h-4" />,
+                    onClick: () => setDeleting(d),
+                    danger: true,
+                  },
+                ]
+              : []),
+          ]}
+        />
+      ),
+    },
   ];
 
-  return <div className="space-y-6">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div><h1 className="text-xl font-bold text-slate-900">Documents</h1><p className="text-xs text-slate-500 mt-1">Browse and manage authorized documents.</p></div>
-      <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => load(page)} disabled={loading} leftIcon={<RefreshCw className={loading ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'}/>}>Refresh</Button>{canManage && <Button variant="primary" size="sm" onClick={() => setUploadOpen(true)} leftIcon={<FileUp className="w-4 h-4"/>}>Upload</Button>}</div>
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            Knowledge Documents
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Browse and manage authorized documents grounded in your workspace.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load(page)}
+            disabled={loading}
+            leftIcon={
+              <RefreshCw className={loading ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} />
+            }
+          >
+            Refresh
+          </Button>
+          {canManage && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setUploadOpen(true)}
+              leftIcon={<FileUp className="w-4 h-4" />}
+            >
+              Upload Document
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200 dark:border-[#1f2d44] shadow-xs flex flex-col md:flex-row gap-3">
+        <div className="flex-1">
+          <Input
+            placeholder="Search title, description, or filename..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            leftIcon={<Search className="w-4 h-4" />}
+          />
+        </div>
+        <div className="w-full md:w-44">
+          <Select
+            options={statusOptions}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          />
+        </div>
+        {isAdmin && (
+          <div className="w-full md:w-52">
+            <Select
+              options={[
+                { value: '', label: 'All Departments' },
+                ...departments.map((d) => ({ value: d.id, label: d.name })),
+              ]}
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="text-xs text-slate-500 dark:text-slate-400 px-1">{filteredCountLabel}</div>
+
+      <Table
+        columns={columns}
+        data={documents}
+        keyExtractor={(d) => d.id}
+        isLoading={loading}
+        emptyTitle="No documents found"
+        emptyDescription={
+          q || status || departmentId
+            ? 'No documents match your active filters.'
+            : 'Upload a document to start building your verified workspace.'
+        }
+        emptyActionText={!q && !status && !departmentId && canManage ? 'Upload Document' : undefined}
+        onEmptyAction={() => setUploadOpen(true)}
+      />
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            Page {page + 1} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => load(page - 1)}
+              disabled={page <= 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => load(page + 1)}
+              disabled={page >= totalPages - 1}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <UploadDocumentModal
+        isOpen={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        departments={departments}
+        onUploaded={() => load(0)}
+      />
+      <EditDocumentModal
+        isOpen={!!editing}
+        document={editing}
+        departments={departments}
+        onClose={() => setEditing(null)}
+        onUpdated={() => {
+          setEditing(null);
+          load(page);
+        }}
+      />
+      <ReplaceDocumentModal
+        isOpen={!!replacing}
+        document={replacing}
+        onClose={() => setReplacing(null)}
+        onUpdated={() => {
+          setReplacing(null);
+          load(page);
+        }}
+      />
+      <ConfirmDialog
+        isOpen={!!deleting}
+        title="Delete document?"
+        message={
+          deleting
+            ? `Delete "${deleting.title}"? This permanently removes the stored file, chunks, and vector index. This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete Document"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+        onConfirm={remove}
+        onCancel={() => setDeleting(null)}
+      />
+      <Modal
+        isOpen={!!preview}
+        onClose={closePreview}
+        title={preview?.doc.title || 'Preview'}
+        description={preview ? `${preview.doc.originalFileName} · v${preview.doc.version}` : ''}
+        size="xl"
+      >
+        {preview &&
+          (preview.doc.mimeType === 'application/pdf' ? (
+            <iframe
+              src={preview.url}
+              title={preview.doc.title}
+              className="w-full h-[65vh] rounded-xl border border-slate-200 dark:border-[#1f2d44]"
+            />
+          ) : preview.doc.mimeType.startsWith('text/') ? (
+            <iframe
+              src={preview.url}
+              title={preview.doc.title}
+              className="w-full h-[65vh] rounded-xl border border-slate-200 dark:border-[#1f2d44] bg-white dark:bg-[#111827]"
+            />
+          ) : (
+            <div className="py-12 text-center">
+              <FileText className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500 mb-2" />
+              <p className="mt-3 text-sm font-medium text-slate-800 dark:text-slate-200">
+                Preview is not available for DOCX in the browser.
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                Download the file to view it in Microsoft Word or another compatible document editor.
+              </p>
+              <Button className="mt-4" variant="primary" onClick={() => download(preview.doc)}>
+                Download file
+              </Button>
+            </div>
+          ))}
+      </Modal>
     </div>
-    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-3">
-      <div className="flex-1"><Input placeholder="Search title, description, or filename..." value={q} onChange={e => setQ(e.target.value)} leftIcon={<Search className="w-4 h-4"/>}/></div>
-      <div className="w-full md:w-44"><Select options={statusOptions} value={status} onChange={e => setStatus(e.target.value)}/></div>
-      {isAdmin && <div className="w-full md:w-52"><Select options={[{ value: '', label: 'All Departments' }, ...departments.map(d => ({ value: d.id, label: d.name }))]} value={departmentId} onChange={e => setDepartmentId(e.target.value)}/></div>}
-    </div>
-    <div className="text-xs text-slate-500 px-1">{filteredCountLabel}</div>
-    <Table columns={columns} data={documents} keyExtractor={d => d.id} isLoading={loading} emptyTitle="No documents found" emptyDescription={q || status || departmentId ? 'No documents match your filters.' : 'Upload a document to start building your workspace.'} emptyActionText={!q && !status && !departmentId && canManage ? 'Upload Document' : undefined} onEmptyAction={() => setUploadOpen(true)}/>
-    {totalPages > 1 && <div className="flex items-center justify-between px-2 text-xs text-slate-500"><span>Page {page + 1} of {totalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => load(page - 1)} disabled={page <= 0}>Previous</Button><Button variant="outline" size="sm" onClick={() => load(page + 1)} disabled={page >= totalPages - 1}>Next</Button></div></div>}
-    <UploadDocumentModal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} departments={departments} onUploaded={() => load(0)}/>
-    <EditDocumentModal isOpen={!!editing} document={editing} departments={departments} onClose={() => setEditing(null)} onUpdated={() => { setEditing(null); load(page); }}/>
-    <ReplaceDocumentModal isOpen={!!replacing} document={replacing} onClose={() => setReplacing(null)} onUpdated={() => { setReplacing(null); load(page); }}/>
-    <ConfirmDialog isOpen={!!deleting} title="Delete document?" message={deleting ? `Delete "${deleting.title}"? This removes the stored file and cannot be undone.` : ''} confirmText="Delete Document" cancelText="Cancel" variant="danger" isLoading={actionLoading} onConfirm={remove} onCancel={() => setDeleting(null)}/>
-    <Modal isOpen={!!preview} onClose={closePreview} title={preview?.doc.title || 'Preview'} description={preview ? `${preview.doc.originalFileName} · v${preview.doc.version}` : ''} size="xl">
-      {preview && (preview.doc.mimeType === 'application/pdf' ? <iframe src={preview.url} title={preview.doc.title} className="w-full h-[65vh] rounded border border-slate-200"/> : preview.doc.mimeType.startsWith('text/') ? <iframe src={preview.url} title={preview.doc.title} className="w-full h-[65vh] rounded border border-slate-200 bg-white"/> : <div className="py-12 text-center"><FileText className="w-10 h-10 mx-auto text-slate-400"/><p className="mt-3 text-sm font-medium text-slate-700">Preview is not available for DOCX in the browser.</p><p className="text-xs text-slate-500 mt-1">Download the file to open it in Microsoft Word or another compatible editor.</p><Button className="mt-4" variant="primary" onClick={() => download(preview.doc)}>Download file</Button></div>)}
-    </Modal>
-  </div>;
+  );
 };

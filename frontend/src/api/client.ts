@@ -2,14 +2,15 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '../utils/storage';
 import { ApiError } from '../types/api';
 
-const baseURL = import.meta.env.VITE_API_URL || '';
+const rawBaseURL = import.meta.env.VITE_API_URL || '';
+export const API_BASE_URL = rawBaseURL.trim().replace(/\/+$/, '');
 
 export const apiClient = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 30000,
 });
 
 // Attach Authorization header if token exists

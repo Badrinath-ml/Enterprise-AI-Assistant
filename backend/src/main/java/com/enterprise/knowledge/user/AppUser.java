@@ -77,4 +77,5 @@ public class AppUser {
     public void setDepartment(Department department) { this.department = department; }
     public void setRole(UserRole role) { this.role = role; }
     public void setActive(boolean active) { this.active = active; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 }

@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -10,6 +11,14 @@ export default {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       colors: {
+        dark: {
+          bg: '#000000',
+          surface: '#0a0a0a',
+          card: '#0f0f0f',
+          cardHover: '#171717',
+          border: '#1f1f1f',
+          subtle: '#262626',
+        },
         brand: {
           50: '#f0f5ff',
           100: '#e0ebff',

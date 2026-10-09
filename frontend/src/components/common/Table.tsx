@@ -35,7 +35,7 @@ export function Table<T>({
 }: TableProps<T>) {
   if (isLoading) {
     return (
-      <div className={`bg-white rounded-lg border border-slate-200 overflow-hidden ${className}`}>
+      <div className={`bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1f2d44] overflow-hidden ${className}`}>
         <TableSkeleton rows={5} cols={columns.length} />
       </div>
     );
@@ -62,11 +62,11 @@ export function Table<T>({
 
   return (
     <div
-      className={`bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs ${className}`}
+      className={`bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-[#1f2d44] overflow-hidden shadow-xs ${className}`}
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+          <thead className="bg-slate-50 dark:bg-[#0c121e] border-b border-slate-200 dark:border-[#1f2d44] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">
             <tr>
               {columns.map((col) => (
                 <th
@@ -79,9 +79,9 @@ export function Table<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-700">
+          <tbody className="divide-y divide-slate-100 dark:divide-[#1f2d44] text-slate-700 dark:text-slate-300">
             {data.map((item, idx) => (
-              <tr key={keyExtractor(item, idx)} className="hover:bg-slate-50/70 transition-colors">
+              <tr key={keyExtractor(item, idx)} className="hover:bg-slate-50/70 dark:hover:bg-[#182338]/60 transition-colors">
                 {columns.map((col) => (
                   <td
                     key={col.key}

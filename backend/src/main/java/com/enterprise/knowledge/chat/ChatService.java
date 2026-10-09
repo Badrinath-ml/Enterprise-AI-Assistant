@@ -388,7 +388,7 @@ public class ChatService {
                 attachmentId, conversation.getTenant(), conversation, user,
                 stored.originalFileName(), mimeType, stored.size(), stored.storageKey()
         );
-        attachment = attachmentRepository.save(attachment);
+        attachment = attachmentRepository.saveAndFlush(attachment);
 
         // Synchronously extract and embed private attachment chunks
         try {

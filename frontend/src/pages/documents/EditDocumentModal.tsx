@@ -8,6 +8,7 @@ import { DocumentResponse, DocumentStatus } from '../../types/document';
 import { DepartmentResponse } from '../../types/department';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { dataSync } from '../../utils/dataSync';
 
 export const EditDocumentModal: React.FC<{
   isOpen: boolean;
@@ -37,30 +38,82 @@ export const EditDocumentModal: React.FC<{
     if (!document) return;
     setSaving(true);
     try {
-      await documentApi.update(document.id, { title, description, departmentId: departmentId || null, status });
+      await documentApi.update(document.id, {
+        title,
+        description,
+        departmentId: departmentId || null,
+        status,
+      });
       success('Document details updated.', 'Document Updated');
+      dataSync.notify('documents');
       onUpdated();
     } catch (e) {
       error((e as { message?: string }).message || 'Unable to update document.', 'Update Failed');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isAdmin = user?.role === 'ADMIN';
-  const options = [{ value: '', label: 'Organization-wide' }, ...departments.map(d => ({ value: d.id, label: d.name }))];
+  const options = [
+    { value: '', label: 'Organization-wide' },
+    ...departments.map((d) => ({ value: d.id, label: d.name })),
+  ];
 
-  return <Modal isOpen={isOpen} onClose={onClose} title="Edit document" description="Update metadata, department, or workflow status.">
-    <form onSubmit={submit} className="space-y-4">
-      <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} required />
-      <div><label className="block text-xs font-medium text-slate-700 mb-1.5">Description</label><textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-slate-200" /></div>
-      <Select label="Department" value={departmentId} onChange={e => setDepartmentId(e.target.value)} disabled={!isAdmin} options={options} />
-      <Select label="Status" value={status} onChange={e => setStatus(e.target.value as DocumentStatus)} options={[
-        { value: 'DRAFT', label: 'Draft' },
-        { value: 'PENDING_REVIEW', label: 'Pending review' },
-        { value: 'APPROVED', label: 'Approved' },
-        { value: 'REJECTED', label: 'Rejected' },
-        { value: 'ARCHIVED', label: 'Archived' },
-      ]} />
-      <div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" isLoading={saving}>Save changes</Button></div>
-    </form>
-  </Modal>;
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Document"
+      description="Update metadata, department assignment, or lifecycle status."
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
+            rows={3}
+            placeholder="Document description"
+            className="w-full rounded-lg border border-slate-300 dark:border-[#22314a] bg-white dark:bg-[#111827] text-slate-900 dark:text-slate-100 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+          />
+        </div>
+
+        <Select
+          label="Department Scope"
+          value={departmentId}
+          onChange={(e) => setDepartmentId(e.target.value)}
+          disabled={!isAdmin}
+          options={options}
+        />
+
+        <Select
+          label="Lifecycle Status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as DocumentStatus)}
+          options={[
+            { value: 'DRAFT', label: 'Draft' },
+            { value: 'PENDING_REVIEW', label: 'Pending review' },
+            { value: 'APPROVED', label: 'Approved (Available for AI Chat)' },
+            { value: 'REJECTED', label: 'Rejected' },
+            { value: 'ARCHIVED', label: 'Archived' },
+          ]}
+        />
+
+        <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-[#1f2d44]">
+          <Button variant="outline" type="button" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" isLoading={saving}>
+            Save Changes
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
 };

@@ -1,1 +1,32 @@
-import {apiClient}from'./client';import{CreateUserRequest,UpdateUserRequest,UserResponse}from'../types/user';export const userApi={async createUser(p:CreateUserRequest){const r=await apiClient.post<UserResponse>('/api/v1/users',p);return r.data;},async getUsers(departmentId?:string){const r=await apiClient.get<UserResponse[]>('/api/v1/users',{params:departmentId?{departmentId}:undefined});return r.data;},async updateUser(id:string,p:UpdateUserRequest){const r=await apiClient.put<UserResponse>(`/api/v1/users/${id}`,p);return r.data;},async deleteUser(id:string){await apiClient.delete(`/api/v1/users/${id}`);}};
+import { apiClient } from './client';
+import { CreateUserRequest, UpdateUserRequest, UserResponse } from '../types/user';
+
+export const userApi = {
+  async createUser(p: CreateUserRequest) {
+    const r = await apiClient.post<UserResponse>('/api/v1/users', p);
+    return r.data;
+  },
+
+  async getUsers(departmentId?: string) {
+    const r = await apiClient.get<UserResponse[]>('/api/v1/users', {
+      params: departmentId ? { departmentId } : undefined,
+    });
+    return r.data;
+  },
+
+  async updateUser(id: string, p: UpdateUserRequest) {
+    const r = await apiClient.put<UserResponse>(`/api/v1/users/${id}`, p);
+    return r.data;
+  },
+
+  async deleteUser(id: string) {
+    await apiClient.delete(`/api/v1/users/${id}`);
+  },
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    await apiClient.put('/api/v1/users/me/password', {
+      currentPassword,
+      newPassword,
+    });
+  },
+};

@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, API_BASE_URL } from './client';
 import { storage } from '../utils/storage';
 import { ChatCitation, ChatConversation, ChatHistory, ChatSendResponse, ChatSource, IngestionResponse } from '../types/chat';
 
@@ -35,7 +35,7 @@ export const chatApi = {
     onCitation?: (citation: ChatCitation) => void,
   ): Promise<void> {
     const token = storage.getToken();
-    const base = import.meta.env.VITE_API_URL || '';
+    const base = API_BASE_URL;
     const response = await fetch(`${base}/api/v1/chat/conversations/${id}/stream?message=${encodeURIComponent(message)}`, {
       method: 'POST',
       headers: {

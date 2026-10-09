@@ -92,14 +92,16 @@ export const RegisterPage: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-slate-900">Create new organization</h3>
-        <p className="text-xs text-slate-500 mt-1">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Create new organization
+        </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Create your organization and the first administrator account.
         </p>
       </div>
 
       {formError && (
-        <div className="mb-5 p-3 rounded-md bg-rose-50 border border-rose-200 text-xs text-rose-700">
+        <div className="mb-5 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300">
           {formError}
         </div>
       )}
@@ -172,12 +174,12 @@ export const RegisterPage: React.FC = () => {
         </Button>
       </form>
 
-      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-        <p className="text-xs text-slate-500">
+      <div className="mt-6 pt-5 border-t border-slate-100 dark:border-[#1f2d44] text-center">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Already have an organization?{' '}
           <Link
             to="/login"
-            className="font-semibold text-slate-900 hover:underline inline-flex items-center gap-1"
+            className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
           >
             Sign in
           </Link>

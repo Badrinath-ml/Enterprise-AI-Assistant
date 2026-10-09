@@ -32,7 +32,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
       const tableWrapped = rawHtml
         .replace(
           /<table>/g,
-          '<div class="my-3 overflow-x-auto rounded-lg border border-slate-200 shadow-2xs bg-white"><table class="w-full text-left text-xs border-collapse">'
+          '<div class="my-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-[#222222] shadow-2xs bg-white dark:bg-[#0a0a0c]"><table class="w-full text-left text-xs border-collapse">'
         )
         .replace(/<\/table>/g, '</table></div>');
 

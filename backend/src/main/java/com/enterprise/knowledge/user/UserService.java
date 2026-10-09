@@ -87,6 +87,16 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
+    public void changePassword(UUID tenantId, UUID userId, String currentPassword, String newPassword) {
+        AppUser user = findByIdAndTenant(userId, tenantId);
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
     public boolean matchesPassword(AppUser user, String rawPassword) {
         return passwordEncoder.matches(rawPassword, user.getPasswordHash());
     }

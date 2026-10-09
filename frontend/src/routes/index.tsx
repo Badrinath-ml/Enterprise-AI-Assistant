@@ -28,9 +28,16 @@ export const AppRoutes: React.FC = () => (
       <Route path="/team" element={<RoleRoute allowedRoles={['MANAGER']}><UsersPage /></RoleRoute>} />
       <Route path="/departments" element={<RoleRoute allowedRoles={['ADMIN']}><DepartmentsPage /></RoleRoute>} />
       <Route path="/documents" element={<DocumentsPage />} />
-      <Route path="/chat" element={<ChatPage />} />
       <Route path="/profile" element={<ProfilePage />} />
     </Route>
+    <Route
+      path="/chat"
+      element={
+        <ProtectedRoute>
+          <ChatPage />
+        </ProtectedRoute>
+      }
+    />
     <Route path="*" element={<NotFoundPage />} />
   </Routes>
 );

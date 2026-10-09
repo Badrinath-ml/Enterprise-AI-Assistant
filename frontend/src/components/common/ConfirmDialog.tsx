@@ -50,13 +50,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     >
       <div className="flex items-start gap-3">
         <div
-          className={`p-2 rounded-full ${
-            variant === 'danger' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-700'
+          className={`p-2.5 rounded-xl shrink-0 ${
+            variant === 'danger'
+              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50'
+              : 'bg-slate-100 dark:bg-[#182338] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#22314a]'
           }`}
         >
           <AlertCircle className="w-5 h-5" />
         </div>
-        <p className="text-xs text-slate-600 leading-relaxed mt-1">{message}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mt-1">{message}</p>
       </div>
     </Modal>
   );
