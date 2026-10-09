@@ -42,7 +42,7 @@ class ConversationDeletionTest {
     void setUp() {
         chatService = new ChatService(
                 conversations, null, null, attachmentRepository, null, null, null,
-                null, null, null, null, null, null, null, storage, null, null, null
+                null, null, null, null, null, storage, mock(ChatAttachmentIngestionService.class), null, null
         );
     }
 
