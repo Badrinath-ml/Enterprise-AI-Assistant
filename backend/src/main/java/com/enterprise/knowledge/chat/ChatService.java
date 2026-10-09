@@ -11,9 +11,7 @@ import com.enterprise.knowledge.document.DocumentStatus;
 import com.enterprise.knowledge.document.IngestionStatus;
 import com.enterprise.knowledge.document.dto.DocumentResponse;
 import com.enterprise.knowledge.document.ingestion.DocumentTextExtractorService;
-import com.enterprise.knowledge.document.ingestion.EmbeddingService;
 import com.enterprise.knowledge.document.ingestion.ExtractedDocument;
-import com.enterprise.knowledge.document.ingestion.TextChunker;
 import com.enterprise.knowledge.document.storage.FileStorageService;
 import com.enterprise.knowledge.tenant.Tenant;
 import com.enterprise.knowledge.tenant.TenantRepository;
@@ -24,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,10 +52,8 @@ public class ChatService {
     private final TenantRepository tenantRepository;
     private final DocumentService documentService;
     private final DocumentTextExtractorService extractor;
-    private final TextChunker chunker;
-    private final EmbeddingService embeddingService;
     private final FileStorageService storage;
-    private final JdbcTemplate jdbcTemplate;
+    private final ChatAttachmentIngestionService attachmentIngestionService;
     private final ChatPersistenceService persistence;
     private final ThreadPoolTaskExecutor chatStreamExecutor;
 
@@ -74,10 +69,8 @@ public class ChatService {
                        TenantRepository tenantRepository,
                        DocumentService documentService,
                        DocumentTextExtractorService extractor,
-                       TextChunker chunker,
-                       EmbeddingService embeddingService,
                        FileStorageService storage,
-                       JdbcTemplate jdbcTemplate,
+                       ChatAttachmentIngestionService attachmentIngestionService,
                        ChatPersistenceService persistence,
                        @Qualifier("chatStreamExecutor") ThreadPoolTaskExecutor chatStreamExecutor) {
         this.conversations = conversations;
@@ -92,10 +85,8 @@ public class ChatService {
         this.tenantRepository = tenantRepository;
         this.documentService = documentService;
         this.extractor = extractor;
-        this.chunker = chunker;
-        this.embeddingService = embeddingService;
         this.storage = storage;
-        this.jdbcTemplate = jdbcTemplate;
+        this.attachmentIngestionService = attachmentIngestionService;
         this.persistence = persistence;
         this.chatStreamExecutor = chatStreamExecutor;
     }
@@ -366,7 +357,6 @@ public class ChatService {
     public record StreamErrorResponse(String message) {}
     public record StreamDoneResponse(UUID conversationId, String provider, String model) {}
 
-    @Transactional
     public DocumentResponse upload(UUID tenantId, UUID userId, UUID conversationId, MultipartFile file) {
         ChatConversation conversation = getConversation(tenantId, userId, conversationId);
         AppUser user = userService.findByIdAndTenant(userId, tenantId);
@@ -388,51 +378,27 @@ public class ChatService {
                 attachmentId, conversation.getTenant(), conversation, user,
                 stored.originalFileName(), mimeType, stored.size(), stored.storageKey()
         );
+        attachment.setIngestionStatus(IngestionStatus.PROCESSING);
+        // Persist the attachment in its own repository transaction before indexing. This ensures
+        // the attachment row remains valid even if a later vector insert fails.
         attachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Synchronously extract and embed private attachment chunks
         try {
-            Resource resource = storage.loadAsResource(stored.storageKey());
-            ExtractedDocument extracted;
-            try (InputStream is = resource.getInputStream()) {
-                extracted = extractor.extract(is, stored.originalFileName(), attachment.getMimeType());
-            }
-
-            List<TextChunker.DocumentChunkItem> chunkItems = chunker.chunkPages(extracted.pages());
-            if (chunkItems.isEmpty()) {
-                attachment.setIngestionStatus(IngestionStatus.FAILED);
-                attachment.setIngestionError("No extractable text found in file");
-                attachmentRepository.save(attachment);
-            } else {
-                List<String> chunkTexts = chunkItems.stream().map(TextChunker.DocumentChunkItem::content).toList();
-                List<float[]> embeddings = embeddingService.embedDocuments(chunkTexts);
-
-                for (int i = 0; i < chunkItems.size(); i++) {
-                    TextChunker.DocumentChunkItem item = chunkItems.get(i);
-                    float[] emb = embeddings.get(i);
-                    UUID chunkId = UUID.randomUUID();
-                    String vectorLiteral = toVectorLiteral(emb);
-
-                    jdbcTemplate.update("""
-                            INSERT INTO chat_conversation_attachment_chunks
-                            (id, tenant_id, conversation_id, attachment_id, chunk_index, content, token_count,
-                             embedding, embedding_provider, embedding_model, embedding_dimensions, page_number, source_locator)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?::vector, ?, ?, ?, ?, ?)
-                            """,
-                            chunkId, tenantId, conversationId, attachmentId, item.chunkIndex(), item.content(),
-                            item.tokenCount(), vectorLiteral, embeddingService.provider(), embeddingService.model(),
-                            embeddingService.dimensions(), item.pageNumber(), item.sourceLocator());
-                }
-
-                attachment.setIngestionStatus(IngestionStatus.INDEXED);
-                attachment.setIndexedChunkCount(chunkItems.size());
-                attachmentRepository.save(attachment);
-            }
+            // The ingestion service has its own transaction. A failed chunk insert rolls back
+            // all chunks, while the attachment remains available with FAILED status and diagnostics.
+            attachmentIngestionService.index(tenantId, conversationId, attachmentId, stored.storageKey(),
+                    stored.originalFileName(), mimeType);
+            attachment = attachmentRepository.findByIdAndTenantIdAndUserId(attachmentId, tenantId, userId)
+                    .orElseThrow(() -> new IllegalStateException("Uploaded attachment could not be reloaded"));
         } catch (Exception e) {
-            log.error("Failed to index private attachment {}: {}", attachmentId, e.getMessage(), e);
+            log.error("Failed to index private chat attachment {}: {}", attachmentId, e.getMessage(), e);
+            attachment = attachmentRepository.findByIdAndTenantIdAndUserId(attachmentId, tenantId, userId)
+                    .orElseThrow(() -> new IllegalStateException("Uploaded attachment could not be reloaded", e));
             attachment.setIngestionStatus(IngestionStatus.FAILED);
-            attachment.setIngestionError(e.getMessage() != null ? e.getMessage() : "Extraction failed");
-            attachmentRepository.save(attachment);
+            String reason = e.getMessage() == null || e.getMessage().isBlank()
+                    ? "Document indexing failed. Please try another file." : e.getMessage();
+            attachment.setIngestionError(reason.length() > 1900 ? reason.substring(0, 1900) : reason);
+            attachmentRepository.saveAndFlush(attachment);
         }
 
         return new DocumentResponse(
@@ -572,15 +538,6 @@ public class ChatService {
                 history.isBlank() ? "(none)" : history,
                 context.isBlank() ? "(no matching approved indexed source)" : context,
                 prompt);
-    }
-
-    private String toVectorLiteral(float[] vector) {
-        StringBuilder b = new StringBuilder("[");
-        for (int i = 0; i < vector.length; i++) {
-            if (i > 0) b.append(',');
-            b.append(Float.toString(vector[i]));
-        }
-        return b.append(']').toString();
     }
 
     private ChatConversation getConversation(UUID tenantId, UUID userId, UUID id) {
