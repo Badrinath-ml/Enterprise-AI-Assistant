@@ -107,7 +107,10 @@ export const chatApi = {
   }> {
     const form = new FormData();
     form.append('file', file);
-    const r = await apiClient.post(`/api/v1/chat/conversations/${id}/upload`, form);
+    const r = await apiClient.post(`/api/v1/chat/conversations/${id}/upload`, form, {
+      // Let the browser set multipart/form-data with the required boundary.
+      headers: { 'Content-Type': undefined },
+    });
     return r.data;
   },
   async source(documentId: string): Promise<ChatSource> {
