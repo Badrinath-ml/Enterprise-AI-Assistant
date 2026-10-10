@@ -129,8 +129,12 @@ public class ChatService {
             }
         }
 
-        // Deleting conversation cascades messages, citations, attachments, and attachment chunks in DB.
-        // It NEVER deletes shared organizational documents.
+        // Remove attachment entities before deleting the parent conversation. Database foreign-key
+        // cascades clean up private chunks and attachment citations; shared documents are untouched.
+        if (!atts.isEmpty()) {
+            attachmentRepository.deleteAllInBatch(atts);
+            attachmentRepository.flush();
+        }
         conversations.delete(c);
         log.info("Deleted conversation: id={}, tenant={}, user={}", conversationId, tenantId, userId);
     }
