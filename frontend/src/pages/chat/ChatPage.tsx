@@ -89,16 +89,16 @@ export const ChatPage: React.FC = () => {
   }, [error]);
 
   const loadHistory = useCallback(
-    async (conversation: ChatConversation) => {
-      setLoadingHistory(true);
+    async (conversation: ChatConversation, showLoading = true) => {
+      if (showLoading) setLoadingHistory(true);
       try {
         const result = await chatApi.getHistory(conversation.id);
         setMessages(result.messages);
         shouldAutoScrollRef.current = true;
       } catch {
-        error('Unable to load this conversation.', 'Chat');
+        if (showLoading) error('Unable to load this conversation.', 'Chat');
       } finally {
-        setLoadingHistory(false);
+        if (showLoading) setLoadingHistory(false);
       }
     },
     [error]
@@ -224,8 +224,9 @@ export const ChatPage: React.FC = () => {
         }
       );
 
-      // Reload turn from server
-      await loadHistory(targetConversation);
+      // Replace temporary client-side message IDs with persisted messages without
+      // switching the entire thread back to its initial history-loading screen.
+      await loadHistory(targetConversation, false);
       await loadConversations();
     } catch (e) {
       const msg = (e as { message?: string }).message || 'Unable to generate an answer.';
@@ -274,20 +275,10 @@ export const ChatPage: React.FC = () => {
     setAttachedName(file.name);
     try {
       const doc = await chatApi.upload(target.id, file);
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        const status = await chatApi.ingestion(doc.id);
-        if (status.ingestionStatus === 'INDEXED') {
-          ready = true;
-          break;
-        }
-        if (status.ingestionStatus === 'FAILED') {
-          throw new Error(status.ingestionError || 'Document indexing failed');
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      if (!ready) {
-        throw new Error('Document is still indexing. Please wait a moment and try again.');
+      // Chat uploads are private attachments, not shared /api/v1/documents records.
+      // The upload response includes the actual private attachment ingestion result.
+      if (doc.ingestionStatus !== 'INDEXED') {
+        throw new Error(doc.ingestionError || 'Document indexing failed. Please try another file.');
       }
       success(`${file.name} is indexed and ready for questions.`, 'Document Ready');
     } catch (e) {
