@@ -578,48 +578,21 @@ export const ChatPage: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Render Source Citation Cards */}
+                        {/* Compact source capsule opens the complete evidence list */}
                         {m.citations && m.citations.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                              <span className="font-semibold flex items-center gap-1.5">
-                                <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-                                Grounded Evidence ({m.citations.length}{' '}
-                                {m.citations.length === 1 ? 'source' : 'sources'})
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveMessageCitations(m.citations)}
+                              className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:border-indigo-400/60 hover:bg-indigo-500/15 transition-colors cursor-pointer"
+                              aria-label={`Show all ${m.citations.length} sources`}
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>Sources</span>
+                              <span className="rounded-full bg-indigo-400/15 px-1.5 py-0.5 text-[10px] tabular-nums text-indigo-200">
+                                {m.citations.length}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveMessageCitations(m.citations)}
-                                className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2 cursor-pointer font-medium"
-                              >
-                                View all evidence →
-                              </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              {m.citations.map((c, idx) => (
-                                <button
-                                  key={c.id || idx}
-                                  type="button"
-                                  onClick={() => openSourceDocument(c, m.citations)}
-                                  title={c.snippet || c.fileName}
-                                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#292936] bg-[#101014] px-3 py-1.5 text-left text-[11px] text-slate-300 hover:border-indigo-500/60 hover:bg-indigo-500/10 hover:text-white transition-colors cursor-pointer group"
-                                >
-                                  <BookOpen className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
-                                  <span className="max-w-[220px] truncate font-medium group-hover:text-indigo-200">
-                                    {c.title || c.fileName || 'Reference Document'}
-                                  </span>
-                                  {(c.locatorLabel || c.pageNumber != null) && (
-                                    <span className="shrink-0 text-[10px] text-slate-500">
-                                      {c.locatorLabel || `p. ${c.pageNumber}`}
-                                    </span>
-                                  )}
-                                  <span className="shrink-0 rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-mono text-indigo-300">
-                                    {Math.round((c.confidence ?? c.similarity ?? 0) * 100)}%
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
+                            </button>
                           </div>
                         )}
                       </div>
