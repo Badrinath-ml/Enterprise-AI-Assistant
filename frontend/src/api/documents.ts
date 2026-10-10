@@ -25,7 +25,7 @@ export const documentApi = {
     if (description.trim()) form.append('description', description.trim());
     if (departmentId) form.append('departmentId', departmentId);
     const response = await apiClient.post<DocumentResponse>('/api/v1/documents', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     });
     return response.data;
   },

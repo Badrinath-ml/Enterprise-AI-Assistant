@@ -89,16 +89,16 @@ export const ChatPage: React.FC = () => {
   }, [error]);
 
   const loadHistory = useCallback(
-    async (conversation: ChatConversation) => {
-      setLoadingHistory(true);
+    async (conversation: ChatConversation, showLoading = true) => {
+      if (showLoading) setLoadingHistory(true);
       try {
         const result = await chatApi.getHistory(conversation.id);
         setMessages(result.messages);
         shouldAutoScrollRef.current = true;
       } catch {
-        error('Unable to load this conversation.', 'Chat');
+        if (showLoading) error('Unable to load this conversation.', 'Chat');
       } finally {
-        setLoadingHistory(false);
+        if (showLoading) setLoadingHistory(false);
       }
     },
     [error]
@@ -224,8 +224,9 @@ export const ChatPage: React.FC = () => {
         }
       );
 
-      // Reload turn from server
-      await loadHistory(targetConversation);
+      // Replace temporary client-side message IDs with persisted messages without
+      // switching the entire thread back to its initial history-loading screen.
+      await loadHistory(targetConversation, false);
       await loadConversations();
     } catch (e) {
       const msg = (e as { message?: string }).message || 'Unable to generate an answer.';
@@ -274,20 +275,10 @@ export const ChatPage: React.FC = () => {
     setAttachedName(file.name);
     try {
       const doc = await chatApi.upload(target.id, file);
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        const status = await chatApi.ingestion(doc.id);
-        if (status.ingestionStatus === 'INDEXED') {
-          ready = true;
-          break;
-        }
-        if (status.ingestionStatus === 'FAILED') {
-          throw new Error(status.ingestionError || 'Document indexing failed');
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      if (!ready) {
-        throw new Error('Document is still indexing. Please wait a moment and try again.');
+      // Chat uploads are private attachments, not shared /api/v1/documents records.
+      // The upload response includes the actual private attachment ingestion result.
+      if (doc.ingestionStatus !== 'INDEXED') {
+        throw new Error(doc.ingestionError || 'Document indexing failed. Please try another file.');
       }
       success(`${file.name} is indexed and ready for questions.`, 'Document Ready');
     } catch (e) {
@@ -587,51 +578,21 @@ export const ChatPage: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Render Source Citation Cards */}
+                        {/* Compact source capsule opens the complete evidence list */}
                         {m.citations && m.citations.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                              <span className="font-semibold flex items-center gap-1.5">
-                                <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-                                Grounded Evidence ({m.citations.length}{' '}
-                                {m.citations.length === 1 ? 'source' : 'sources'})
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveMessageCitations(m.citations)}
+                              className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-200 hover:border-indigo-400/60 hover:bg-indigo-500/15 transition-colors cursor-pointer"
+                              aria-label={`Show all ${m.citations.length} sources`}
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>Sources</span>
+                              <span className="rounded-full bg-indigo-400/15 px-1.5 py-0.5 text-[10px] tabular-nums text-indigo-200">
+                                {m.citations.length}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveMessageCitations(m.citations)}
-                                className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2 cursor-pointer font-medium"
-                              >
-                                View all evidence →
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {m.citations.slice(0, 4).map((c, idx) => (
-                                <button
-                                  key={c.id || idx}
-                                  type="button"
-                                  onClick={() => openSourceDocument(c, m.citations)}
-                                  className="text-left p-2.5 rounded-xl border border-[#1f1f1f] bg-[#0c0c0e] hover:bg-[#141416] hover:border-indigo-500/40 transition-all cursor-pointer group"
-                                >
-                                  <div className="flex items-start justify-between gap-1">
-                                    <span className="text-xs font-semibold text-slate-200 group-hover:text-indigo-300 truncate">
-                                      {c.title || c.fileName || 'Reference Document'}
-                                    </span>
-                                    <span className="text-[10px] text-indigo-400 shrink-0 font-mono">
-                                      {Math.round((c.confidence ?? c.similarity ?? 0) * 100)}%
-                                    </span>
-                                  </div>
-                                  <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-normal font-sans">
-                                    {c.snippet}
-                                  </p>
-                                  {(c.locatorLabel || c.pageNumber != null) && (
-                                    <p className="text-[10px] text-slate-500 mt-1 truncate">
-                                      {c.locatorLabel || `Page ${c.pageNumber}`}
-                                    </p>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
+                            </button>
                           </div>
                         )}
                       </div>
