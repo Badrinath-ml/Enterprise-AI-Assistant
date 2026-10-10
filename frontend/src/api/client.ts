@@ -20,6 +20,11 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // The shared Axios default is JSON. Remove it for FormData so the browser
+    // supplies multipart/form-data with the correct boundary.
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      config.headers.delete('Content-Type');
+    }
     return config;
   },
   (error) => Promise.reject(error)
