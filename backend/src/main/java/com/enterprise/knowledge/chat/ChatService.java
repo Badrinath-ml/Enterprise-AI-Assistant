@@ -132,7 +132,9 @@ public class ChatService {
         // Remove attachment entities before deleting the parent conversation. Database foreign-key
         // cascades clean up private chunks and attachment citations; shared documents are untouched.
         if (!atts.isEmpty()) {
-            attachmentRepository.deleteAllInBatch(atts);
+            // Use entity removals rather than a bulk delete so Hibernate keeps the persistence
+            // context consistent before the parent conversation is removed.
+            attachmentRepository.deleteAll(atts);
             attachmentRepository.flush();
         }
         conversations.delete(c);
