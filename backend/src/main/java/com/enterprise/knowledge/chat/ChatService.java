@@ -361,6 +361,7 @@ public class ChatService {
     public record StreamErrorResponse(String message) {}
     public record StreamDoneResponse(UUID conversationId, String provider, String model) {}
 
+    @Transactional
     public DocumentResponse upload(UUID tenantId, UUID userId, UUID conversationId, MultipartFile file) {
         ChatConversation conversation = getConversation(tenantId, userId, conversationId);
         AppUser user = userService.findByIdAndTenant(userId, tenantId);
