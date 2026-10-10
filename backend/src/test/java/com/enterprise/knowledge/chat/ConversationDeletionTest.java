@@ -65,7 +65,7 @@ class ConversationDeletionTest {
         chatService.delete(tenantId, userId, conversationId);
 
         verify(storage).delete("storage/path/notes.txt");
-        verify(attachmentRepository).deleteAllInBatch(List.of(attachment));
+        verify(attachmentRepository).deleteAll(List.of(attachment));
         verify(attachmentRepository).flush();
         verify(conversations).delete(conversation);
     }
