@@ -596,30 +596,27 @@ export const ChatPage: React.FC = () => {
                               </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {m.citations.slice(0, 4).map((c, idx) => (
+                            <div className="flex flex-wrap gap-2">
+                              {m.citations.map((c, idx) => (
                                 <button
                                   key={c.id || idx}
                                   type="button"
                                   onClick={() => openSourceDocument(c, m.citations)}
-                                  className="text-left p-2.5 rounded-xl border border-[#1f1f1f] bg-[#0c0c0e] hover:bg-[#141416] hover:border-indigo-500/40 transition-all cursor-pointer group"
+                                  title={c.snippet || c.fileName}
+                                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#292936] bg-[#101014] px-3 py-1.5 text-left text-[11px] text-slate-300 hover:border-indigo-500/60 hover:bg-indigo-500/10 hover:text-white transition-colors cursor-pointer group"
                                 >
-                                  <div className="flex items-start justify-between gap-1">
-                                    <span className="text-xs font-semibold text-slate-200 group-hover:text-indigo-300 truncate">
-                                      {c.title || c.fileName || 'Reference Document'}
-                                    </span>
-                                    <span className="text-[10px] text-indigo-400 shrink-0 font-mono">
-                                      {Math.round((c.confidence ?? c.similarity ?? 0) * 100)}%
-                                    </span>
-                                  </div>
-                                  <p className="text-[11px] text-slate-400 line-clamp-2 mt-1 leading-normal font-sans">
-                                    {c.snippet}
-                                  </p>
+                                  <BookOpen className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+                                  <span className="max-w-[220px] truncate font-medium group-hover:text-indigo-200">
+                                    {c.title || c.fileName || 'Reference Document'}
+                                  </span>
                                   {(c.locatorLabel || c.pageNumber != null) && (
-                                    <p className="text-[10px] text-slate-500 mt-1 truncate">
-                                      {c.locatorLabel || `Page ${c.pageNumber}`}
-                                    </p>
+                                    <span className="shrink-0 text-[10px] text-slate-500">
+                                      {c.locatorLabel || `p. ${c.pageNumber}`}
+                                    </span>
                                   )}
+                                  <span className="shrink-0 rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-mono text-indigo-300">
+                                    {Math.round((c.confidence ?? c.similarity ?? 0) * 100)}%
+                                  </span>
                                 </button>
                               ))}
                             </div>
