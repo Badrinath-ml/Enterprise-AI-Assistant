@@ -431,18 +431,29 @@ public class ChatService {
 
     @Transactional(readOnly = true)
     public ChatSourceResponse source(UUID tenantId, UUID userId, UUID documentId) {
-        // First check shared organization documents
+        // Only fall back to private attachments when the shared document lookup fails.
+        // Do not hide storage, permission, or extraction errors by misclassifying a shared
+        // document as a private attachment.
+        Document document = null;
         try {
-            Document document = documentService.getEntity(tenantId, userId, documentId);
-            Resource resource = documentService.content(tenantId, userId, documentId);
-            try (InputStream is = resource.getInputStream()) {
-                byte[] bytes = is.readAllBytes();
-                String text = extractor.extract(bytes, document.getOriginalFileName(), document.getMimeType()).text();
-                return new ChatSourceResponse(document.getId(), document.getTitle(),
-                        document.getOriginalFileName(), document.getMimeType(), document.getVersion(), text);
-            }
+            document = documentService.getEntity(tenantId, userId, documentId);
         } catch (Exception e) {
             log.debug("Document {} not found in shared documents, checking private attachments", documentId);
+        }
+
+        if (document != null) {
+            try {
+                Resource resource = documentService.content(tenantId, userId, documentId);
+                try (InputStream is = resource.getInputStream()) {
+                    byte[] bytes = is.readAllBytes();
+                    String text = extractor.extract(bytes, document.getOriginalFileName(), document.getMimeType()).text();
+                    return new ChatSourceResponse(document.getId(), document.getTitle(),
+                            document.getOriginalFileName(), document.getMimeType(), document.getVersion(), text);
+                }
+            } catch (Exception e) {
+                log.warn("Unable to read shared source document {}: {}", documentId, e.getMessage());
+                throw new IllegalArgumentException("Unable to read source document: " + e.getMessage());
+            }
         }
 
         // Check private chat attachments
@@ -458,6 +469,7 @@ public class ChatService {
                         attachment.getFileName(), attachment.getMimeType(), 1, text);
             }
         } catch (Exception e) {
+            log.warn("Unable to read private attachment {}: {}", documentId, e.getMessage());
             throw new IllegalArgumentException("Unable to read attachment content: " + e.getMessage());
         }
     }
