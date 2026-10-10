@@ -96,16 +96,18 @@ export const chatApi = {
     }
   },
 
-  async upload(id: string, file: File) {
+  async upload(id: string, file: File): Promise<{
+    id: string;
+    title: string;
+    originalFileName: string;
+    version: number;
+    ingestionStatus: IngestionResponse['ingestionStatus'];
+    indexedChunkCount: number;
+    ingestionError?: string | null;
+  }> {
     const form = new FormData();
     form.append('file', file);
-    const r = await apiClient.post(`/api/v1/chat/conversations/${id}/upload`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return r.data as { id: string; title: string; originalFileName: string; version: number };
-  },
-  async ingestion(id: string): Promise<IngestionResponse> {
-    const r = await apiClient.get<IngestionResponse>(`/api/v1/documents/${id}/ingestion`);
+    const r = await apiClient.post(`/api/v1/chat/conversations/${id}/upload`, form);
     return r.data;
   },
   async source(documentId: string): Promise<ChatSource> {
