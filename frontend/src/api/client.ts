@@ -33,7 +33,7 @@ apiClient.interceptors.request.use(
 // Response interceptor to handle auth failures and normalize error format
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
     if (error.response) {
       // 401 Unauthorized: token expired or invalid
       if (error.response.status === 401) {
@@ -42,14 +42,27 @@ apiClient.interceptors.response.use(
         window.dispatchEvent(new CustomEvent('eka:unauthorized'));
       }
 
-      const data = error.response.data;
+      let data: ApiError | undefined = error.response.data as ApiError | undefined;
+      // Axios returns Blob bodies for document preview/download requests, including
+      // JSON error responses. Decode those bodies so the UI can show the real API error.
+      if (typeof Blob !== 'undefined' && data instanceof Blob) {
+        try {
+          const body = await data.text();
+          data = body ? JSON.parse(body) as ApiError : undefined;
+        } catch {
+          data = undefined;
+        }
+      }
+
       const normalizedError: ApiError = {
         status: error.response.status,
         message:
           data?.message ||
           (error.response.status === 403
             ? 'You do not have permission to perform this action.'
-            : 'An unexpected error occurred.'),
+            : error.response.status === 404
+              ? 'The requested document or file was not found.'
+              : 'An unexpected error occurred.'),
         validationErrors: data?.validationErrors || {},
         error: data?.error,
         path: data?.path,
