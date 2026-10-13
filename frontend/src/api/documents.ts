@@ -44,7 +44,7 @@ export const documentApi = {
     const form = new FormData();
     form.append('file', file);
     const response = await apiClient.put<DocumentResponse>(`/api/v1/documents/${id}/content`, form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     });
     return response.data;
   },
